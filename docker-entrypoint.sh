@@ -15,5 +15,11 @@ else
   node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss
 fi
 
+# Next.js en modo standalone escucha en $HOSTNAME si está definida, y Render
+# (como otros hostings) la define con el nombre interno del contenedor en vez
+# de una dirección real, así que el proxy nunca consigue conectar. Se anula
+# aquí para que escuche en todas las interfaces.
+unset HOSTNAME
+
 echo "[arranque] Iniciando Admira Trace en el puerto ${PORT}…"
 exec node server.js
