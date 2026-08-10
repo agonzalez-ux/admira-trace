@@ -1,12 +1,6 @@
 #!/bin/sh
 set -e
 
-# Diagnóstico temporal: comprueba longitud y huella del token de Turso sin
-# imprimir el valor real, para saber si Render lo guardó bien.
-if [ -n "$TURSO_AUTH_TOKEN" ]; then
-  echo "[diagnóstico] TURSO_AUTH_TOKEN longitud=$(printf '%s' "$TURSO_AUTH_TOKEN" | wc -c) sha256=$(printf '%s' "$TURSO_AUTH_TOKEN" | sha256sum | cut -c1-16)"
-fi
-
 if [ -n "$TURSO_DATABASE_URL" ]; then
   # Con Turso, el esquema se aplica a mano una vez (ver scripts/aplicar-migracion-turso.ts),
   # porque la CLI de Prisma no sabe hacer db push/migrate contra una URL libsql://.
