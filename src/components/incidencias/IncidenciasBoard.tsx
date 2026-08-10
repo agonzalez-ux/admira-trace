@@ -280,12 +280,19 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
     const res = await fetch("/api/desk/sync", { method: "POST" });
     const data = await res.json();
     setSincronizando(false);
+    // Aunque el desk falle, la parte de pantallas desconectadas puede haber
+    // funcionado igual (usa otra API): siempre se refresca la lista.
+    load();
     if (!res.ok) {
-      setFeedback({ type: "error", text: data.error || "Error al sincronizar con el desk." });
+      setFeedback({
+        type: "error",
+        text: `${data.error || "Error al sincronizar con el desk."}${
+          data.nuevas || data.actualizadas ? ` (pantallas desconectadas: ${data.nuevas} nuevas, ${data.actualizadas} actualizadas)` : ""
+        }`,
+      });
       return;
     }
-    setFeedback({ type: "ok", text: `Desk sincronizado: ${data.nuevas} nuevas, ${data.actualizadas} actualizadas.` });
-    load();
+    setFeedback({ type: "ok", text: `Sincronizado: ${data.nuevas} nuevas, ${data.actualizadas} actualizadas.` });
   }
 
   async function setEstado(id: string, estado: "EN_CAMINO" | "RESUELTA") {

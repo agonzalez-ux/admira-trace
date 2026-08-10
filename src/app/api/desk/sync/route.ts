@@ -12,21 +12,35 @@ export async function POST() {
     return NextResponse.json({ error: "La integración con el desk no está configurada." }, { status: 400 });
   }
 
+  let nuevas = 0;
+  let actualizadas = 0;
+  let errorDesk: string | null = null;
+
+  // Se separan en dos try/catch independientes: un fallo del desk (p. ej. de
+  // red) no debe impedir que la sincronización de pantallas desconectadas
+  // (que usa la API de Google Sheets, no la del desk) siga funcionando.
   try {
     const resultado = await syncDeskTickets(true);
-    let nuevas = resultado.nuevas;
-    let actualizadas = resultado.actualizadas;
+    nuevas += resultado.nuevas;
+    actualizadas += resultado.actualizadas;
+  } catch (err: any) {
+    errorDesk = err?.message || "Error al sincronizar con el desk.";
+  }
 
-    if (HARDWARE_SYNC_CONFIGURADO) {
+  if (HARDWARE_SYNC_CONFIGURADO) {
+    try {
       const hw = await syncHardwareDesconectado(true);
       nuevas += hw.nuevas;
       actualizadas += hw.actualizadas;
+    } catch (err) {
+      console.error("[hardware-sync] Error sincronizando pantallas desconectadas:", err);
     }
-
-    return NextResponse.json({ ok: true, nuevas, actualizadas });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Error al sincronizar con el desk." }, { status: 502 });
   }
+
+  if (errorDesk) {
+    return NextResponse.json({ error: errorDesk, nuevas, actualizadas }, { status: 502 });
+  }
+  return NextResponse.json({ ok: true, nuevas, actualizadas });
 }
 
 export async function GET() {
