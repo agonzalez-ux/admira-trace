@@ -1,0 +1,2 @@
+# No se debe editar a mano. Marca qué motor usan las migraciones de esta carpeta.
+provider = "sqlite"

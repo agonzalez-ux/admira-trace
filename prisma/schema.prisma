@@ -1,0 +1,261 @@
+generator client {
+  provider        = "prisma-client-js"
+  // Necesario para poder conectar con Turso (libSQL) en producción a través de
+  // un driver adapter, en vez del acceso directo a fichero que usa SQLite normal.
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Directorio maestro de estancos (puntos de venta), importado desde el Excel
+// real "Universo Comerciales". Datos de referencia, no gestionados desde la app.
+model Estanco {
+  id                 String   @id @default(cuid())
+  idEstanco          String   @unique
+  nombre             String
+  direccion          String?
+  municipio          String?
+  codigoPostal       String?
+  provincia          String?
+  telefono           String?
+  zona               String?
+  frecuencia         String?
+  segmento           String?
+  comercial          String?
+  telefonoComercial  String?
+  comentarioComercial String?
+  correoComercial    String?
+  // Coordenadas geocodificadas (OpenStreetMap/Nominatim) para calcular la
+  // distancia aproximada al técnico.
+  lat                Float?
+  lon                Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  incidencias Incidencia[]
+}
+
+// Rol: TECNICO | ADMIRA | FDM
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  role      String
+  name      String
+  email     String?
+  phone     String?
+  zona      String?
+  direccion String?
+  // Datos operativos del técnico (importados de la hoja "New Técnicos").
+  codigoPostal      String?
+  personaContacto   String?
+  horario           String?
+  radioCobertura    String?
+  costeKm           String?
+  condiciones       String?
+  // Coordenadas geocodificadas de `direccion` (OpenStreetMap/Nominatim), para
+  // calcular la distancia aproximada a cada incidencia.
+  lat       Float?
+  lon       Float?
+  active    Boolean  @default(true)
+  // Los usuarios creados con contraseña temporal (p. ej. los técnicos
+  // importados) deben cambiarla la primera vez que entran.
+  debeCambiarPassword Boolean @default(false)
+  passwordCambiadaAt  DateTime?
+  createdAt DateTime @default(now())
+
+  tokensReset       PasswordResetToken[]
+  materiales        Material[]        @relation("MaterialTecnico")
+  enviosDestino     Envio[]           @relation("EnvioTecnico")
+  enviosCreados     Envio[]           @relation("EnvioCreadoPor")
+  incidenciasAsig   Incidencia[]      @relation("IncidenciaTecnico")
+  incidenciasCread  Incidencia[]      @relation("IncidenciaCreadoPor")
+  materialEventos   MaterialEvento[]
+  ordenesRecurrentes OrdenRecurrente[] @relation("OrdenRecurrenteTecnico")
+  ordenesCreadas     OrdenRecurrente[] @relation("OrdenRecurrenteCreadoPor")
+}
+
+// Token de un solo uso para restablecer la contraseña por email.
+// Se guarda hasheado: si alguien accediera a la base de datos, no podría
+// usar los tokens pendientes para entrar en las cuentas.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiraAt  DateTime
+  usadoAt   DateTime?
+  createdAt DateTime @default(now())
+}
+
+// Orden de envío recurrente: cada X días se genera automáticamente un envío
+// del material configurado hacia el técnico.
+model OrdenRecurrente {
+  id            String    @id @default(cuid())
+  tecnicoId     String
+  tecnico       User      @relation("OrdenRecurrenteTecnico", fields: [tecnicoId], references: [id])
+  frecuenciaDias Int
+  transportista String    @default("MARESA")
+  // Tipos de material a reponer y cuántas unidades de cada uno, en JSON:
+  // [{ "tipo": "PANTALLA", "cantidad": 2 }, ...]
+  materialConfig String
+  activa        Boolean   @default(true)
+  notas         String?
+  ultimaEjecucion DateTime?
+  proximaEjecucion DateTime
+  creadoPorId   String?
+  creadoPor     User?     @relation("OrdenRecurrenteCreadoPor", fields: [creadoPorId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  envios Envio[]
+}
+
+// tipo: PANTALLA | ROUTER | REPRODUCTOR | SOPORTE | CABLEADO | MOBILIARIO | OTRO
+// estado: EN_FDM | EN_ADMIRA | EN_TRANSITO_ENVIO | EN_TECNICO | EN_TRANSITO_RECOGIDA | INSTALADO | BAJA
+model Material {
+  id           String   @id @default(cuid())
+  codigoBarras String   @unique
+  tipo         String
+  // Cuando el tipo es "OTRO", aquí se guarda qué es exactamente
+  // (lo escribe quien da de alta el material).
+  tipoPersonalizado String?
+  nombre       String
+  descripcion  String?
+  numeroSerie  String?
+  estado       String   @default("EN_FDM")
+  tecnicoId    String?
+  tecnico      User?    @relation("MaterialTecnico", fields: [tecnicoId], references: [id])
+  ubicacion    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  envioItems     EnvioItem[]
+  eventos        MaterialEvento[]
+  incidenciaUsos IncidenciaMaterial[]
+}
+
+// tipo: ALTA | ENVIO_PREPARADO_FDM | RECEPCION_TECNICO | INSTALACION | RECOGIDA_TECNICO | DEVOLUCION_FDM | BAJA
+model MaterialEvento {
+  id           String    @id @default(cuid())
+  materialId   String
+  material     Material  @relation(fields: [materialId], references: [id])
+  tipo         String
+  fecha        DateTime  @default(now())
+  usuarioId    String?
+  usuario      User?     @relation(fields: [usuarioId], references: [id])
+  envioId      String?
+  incidenciaId String?
+  notas        String?
+}
+
+// tipo: ENVIO | RECOGIDA
+// transportista: MARESA | RENUS | OTRO
+// estado: PENDIENTE_PREPARACION | ENVIADO | EN_TRANSITO | RECIBIDO | INCIDENCIA
+model Envio {
+  id            String    @id @default(cuid())
+  tipo          String    @default("ENVIO")
+  transportista String    @default("MARESA")
+  origen        String
+  destino       String
+  tecnicoId     String
+  tecnico       User      @relation("EnvioTecnico", fields: [tecnicoId], references: [id])
+  estado        String    @default("PENDIENTE_PREPARACION")
+  esRecurrente  Boolean   @default(false)
+  // Si viene de una orden recurrente, queda vinculado a ella para trazabilidad.
+  ordenRecurrenteId String?
+  ordenRecurrente   OrdenRecurrente? @relation(fields: [ordenRecurrenteId], references: [id])
+  notas         String?
+  creadoPorId   String?
+  creadoPor     User?     @relation("EnvioCreadoPor", fields: [creadoPorId], references: [id])
+  fechaCreacion DateTime  @default(now())
+  fechaEnviado  DateTime?
+  fechaRecibido DateTime?
+
+  items EnvioItem[]
+}
+
+model EnvioItem {
+  id                  String    @id @default(cuid())
+  envioId             String
+  envio               Envio     @relation(fields: [envioId], references: [id])
+  materialId          String
+  material             Material  @relation(fields: [materialId], references: [id])
+  escaneadoOrigen      Boolean   @default(false)
+  fechaEscaneoOrigen   DateTime?
+  escaneadoDestino     Boolean   @default(false)
+  fechaEscaneoDestino  DateTime?
+}
+
+// tipo: INSTALACION_NUEVA | REPARACION | MANTENIMIENTO
+// estado: SIN_ASIGNAR | ASIGNADA | EN_CAMINO | RESUELTA
+// origen: MANUAL | DESK
+model Incidencia {
+  id              String    @id @default(cuid())
+  ticketExternoId String?
+  // Datos de la integración con el desk de tickets (api.desk.admira.com).
+  origen          String    @default("MANUAL")
+  deskTicketId    String?   @unique
+  deskProyecto    String?
+  deskEstado      String?
+  titulo          String
+  descripcion     String?
+  tipo            String    @default("REPARACION")
+  cliente         String?
+  direccion       String?
+  tecnicoId       String?
+  tecnico         User?     @relation("IncidenciaTecnico", fields: [tecnicoId], references: [id])
+  estado          String    @default("ASIGNADA")
+  creadoPorId     String?
+  creadoPor       User?     @relation("IncidenciaCreadoPor", fields: [creadoPorId], references: [id])
+  fechaAsignacion DateTime?
+  fechaEnCamino   DateTime?
+  fechaResuelta   DateTime?
+  fechaImportada  DateTime  @default(now())
+
+  // Vínculo (best-effort, por coincidencia de texto) con el directorio real de
+  // estancos, para poder avisar automáticamente al comercial correspondiente.
+  estancoId              String?
+  estanco                Estanco?  @relation(fields: [estancoId], references: [id])
+  estancoMatchConfianza  Float?
+  fechaVisitaProgramada  DateTime?
+  comercialAvisadoProgramada Boolean @default(false)
+  comercialAvisadoEnCamino   Boolean @default(false)
+
+  fotos            FotoEvidencia[]
+  materialesUsados IncidenciaMaterial[]
+  notificaciones   NotificacionComercial[]
+}
+
+// Log de los avisos automáticos enviados al comercial de un estanco.
+// tipo: PROGRAMADA | EN_CAMINO
+model NotificacionComercial {
+  id           String     @id @default(cuid())
+  incidenciaId String
+  incidencia   Incidencia @relation(fields: [incidenciaId], references: [id])
+  tipo         String
+  destinatario String?
+  estado       String // ENVIADO | SIMULADO | ERROR
+  detalle      String?
+  fecha        DateTime   @default(now())
+}
+
+model FotoEvidencia {
+  id           String     @id @default(cuid())
+  incidenciaId String
+  incidencia   Incidencia @relation(fields: [incidenciaId], references: [id])
+  url          String
+  fecha        DateTime   @default(now())
+}
+
+model IncidenciaMaterial {
+  id           String     @id @default(cuid())
+  incidenciaId String
+  incidencia   Incidencia @relation(fields: [incidenciaId], references: [id])
+  materialId   String
+  material     Material   @relation(fields: [materialId], references: [id])
+  fecha        DateTime   @default(now())
+}

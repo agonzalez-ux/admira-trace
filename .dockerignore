@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env*.local
+prisma/dev.db
+prisma/dev.db-journal
+public/uploads
+credenciales-tecnicos.tsv
+Clave/
+*.log
+.DS_Store
