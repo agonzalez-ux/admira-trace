@@ -270,7 +270,7 @@ export default function TecnicoFichaModal({ tecnicoId, onClose }: { tecnicoId: s
       </div>
 
       {incidenciaDetalle && (
-        <IncidenciaDetalle incidencia={incidenciaDetalle} onClose={() => setIncidenciaDetalle(null)} />
+        <IncidenciaDetalle incidencia={incidenciaDetalle} role="ADMIRA" onClose={() => setIncidenciaDetalle(null)} />
       )}
     </div>
   );

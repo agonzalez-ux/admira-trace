@@ -27,7 +27,12 @@ export async function GET() {
   }
 
   const where: any = {};
-  if (session.role === "TECNICO") where.tecnicoId = session.userId;
+  // Los técnicos solo ven sus propias incidencias activas: las resueltas no
+  // les aportan nada en el día a día y solo añaden ruido a la lista.
+  if (session.role === "TECNICO") {
+    where.tecnicoId = session.userId;
+    where.estado = { not: "RESUELTA" };
+  }
 
   const incidencias = await prisma.incidencia.findMany({
     where,

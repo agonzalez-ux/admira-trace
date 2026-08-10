@@ -532,7 +532,17 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
       )}
 
       {scanTarget && <BarcodeScanner onScan={handleScanMaterial} onClose={() => setScanTarget(null)} />}
-      {detalle && <IncidenciaDetalle incidencia={detalle} onClose={() => setDetalle(null)} />}
+      {detalle && (
+        <IncidenciaDetalle
+          incidencia={detalle}
+          role={role}
+          onClose={() => setDetalle(null)}
+          onActualizada={(actualizada) => {
+            setDetalle((prev) => (prev ? { ...prev, estanco: actualizada.estanco ?? null } : prev));
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }

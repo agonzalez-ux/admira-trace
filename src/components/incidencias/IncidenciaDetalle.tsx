@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   ESTADO_INCIDENCIA_LABELS,
   TIPO_INCIDENCIA_LABELS,
@@ -29,6 +30,91 @@ export type IncidenciaDetalleData = {
   fotos: { id: string; url: string }[];
   materialesUsados: { id: string; material: { codigoBarras: string; nombre: string; tipo: string } }[];
 };
+
+type EstancoResultado = { id: string; idEstanco: string; nombre: string; municipio: string | null; provincia: string | null };
+
+/**
+ * Buscador + botón para vincular a mano el estanco de una incidencia cuando
+ * el emparejador automático del desk no lo encontró.
+ */
+function VincularEstanco({
+  incidenciaId,
+  onVinculado,
+}: {
+  incidenciaId: string;
+  onVinculado: (incidencia: IncidenciaDetalleData) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [resultados, setResultados] = useState<EstancoResultado[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function buscar(texto: string) {
+    setQ(texto);
+    setError(null);
+    if (texto.trim().length < 2) {
+      setResultados([]);
+      return;
+    }
+    setBuscando(true);
+    const res = await fetch(`/api/estancos/buscar?q=${encodeURIComponent(texto.trim())}`);
+    const data = await res.json();
+    setResultados(data.estancos || []);
+    setBuscando(false);
+  }
+
+  async function vincular(estancoId: string) {
+    setGuardando(true);
+    setError(null);
+    const res = await fetch(`/api/incidencias/${incidenciaId}/estanco`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estancoId }),
+    });
+    const data = await res.json();
+    setGuardando(false);
+    if (!res.ok) return setError(data.error || "Error al vincular el estanco.");
+    onVinculado(data.incidencia);
+  }
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+      <p className="text-xs text-amber-800 mb-1.5">
+        Esta incidencia no está vinculada a ningún estanco (el emparejador automático no lo encontró). Búscalo a mano
+        para poder calcular la distancia al técnico y avisar al comercial.
+      </p>
+      <input
+        value={q}
+        onChange={(e) => buscar(e.target.value)}
+        placeholder="Buscar por nombre, código o municipio…"
+        className="w-full rounded-lg border border-amber-300 px-2 py-1.5 text-xs"
+        disabled={guardando}
+      />
+      {buscando && <p className="text-[11px] text-amber-700 mt-1">Buscando…</p>}
+      {error && <p className="text-[11px] text-red-600 mt-1">{error}</p>}
+      {resultados.length > 0 && (
+        <div className="mt-1.5 space-y-1 max-h-40 overflow-y-auto">
+          {resultados.map((e) => (
+            <button
+              key={e.id}
+              onClick={() => vincular(e.id)}
+              disabled={guardando}
+              className="w-full text-left text-xs bg-white hover:bg-amber-100 rounded-lg px-2 py-1.5 disabled:opacity-60"
+            >
+              <span className="font-medium text-slate-700">{e.nombre}</span>
+              <span className="text-slate-400">
+                {" "}
+                · {e.idEstanco}
+                {e.municipio ? ` · ${e.municipio}` : ""}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const ESTADO_COLORS: Record<string, string> = {
   SIN_ASIGNAR: "bg-slate-200 text-slate-700",
@@ -70,10 +156,14 @@ function Timeline({ inc }: { inc: IncidenciaDetalleData }) {
 
 export default function IncidenciaDetalle({
   incidencia,
+  role,
   onClose,
+  onActualizada,
 }: {
   incidencia: IncidenciaDetalleData;
+  role: "TECNICO" | "ADMIRA";
   onClose: () => void;
+  onActualizada?: (incidencia: IncidenciaDetalleData) => void;
 }) {
   const inc = incidencia;
 
@@ -177,6 +267,10 @@ export default function IncidenciaDetalle({
                 )}
               </dl>
             </div>
+
+            {!inc.estanco && role === "ADMIRA" && onActualizada && (
+              <VincularEstanco incidenciaId={inc.id} onVinculado={onActualizada} />
+            )}
 
             {inc.descripcion && (
               <div>

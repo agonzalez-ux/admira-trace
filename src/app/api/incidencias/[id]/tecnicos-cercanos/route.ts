@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       tecnicos: tecnicos.map((t) => ({ id: t.id, name: t.name, zona: t.zona, distanciaKm: null })),
       motivoSinDistancia: incidencia.estancoId
         ? "No se han podido obtener las coordenadas del estanco."
-        : "La incidencia no está vinculada a ningún estanco del directorio.",
+        : "No vinculada a ningún estanco: ábrela y vincúlalo a mano para ver las distancias.",
     });
   }
 
