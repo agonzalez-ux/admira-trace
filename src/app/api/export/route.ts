@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { etiquetaTipo } from "@/lib/materialLabel";
+import { etiquetaTipo, etiquetaOrigenIncidencia } from "@/lib/materialLabel";
 import {
   ESTADO_MATERIAL_LABELS,
   ESTADO_ENVIO_LABELS,
@@ -118,7 +118,7 @@ async function buildIncidencias(workbook: ExcelJS.Workbook) {
   });
   for (const i of incidencias) {
     sheet.addRow({
-      origen: i.origen === "DESK" ? "Desk" : "Manual",
+      origen: etiquetaOrigenIncidencia(i.origen),
       ticket: i.ticketExternoId || "",
       titulo: i.titulo,
       tipo: TIPO_INCIDENCIA_LABELS[i.tipo as keyof typeof TIPO_INCIDENCIA_LABELS] || i.tipo,

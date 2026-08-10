@@ -183,6 +183,11 @@ export default function IncidenciaDetalle({
               {inc.origen === "DESK" && (
                 <span className="text-[11px] bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5">Desk</span>
               )}
+              {inc.origen === "HARDWARE" && (
+                <span className="text-[11px] bg-rose-100 text-rose-700 rounded-full px-2 py-0.5">
+                  Pantalla desconectada
+                </span>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none shrink-0">

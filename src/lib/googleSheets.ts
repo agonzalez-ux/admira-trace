@@ -8,7 +8,7 @@ import {
   TIPO_INCIDENCIA_LABELS,
 } from "./constants";
 import { DOCUMENTOS, DocumentKey, getDocumentSpreadsheetId, getDocumentUrl } from "./documentSheets";
-import { etiquetaTipo } from "./materialLabel";
+import { etiquetaTipo, etiquetaOrigenIncidencia } from "./materialLabel";
 
 // "Libro combinado": sigue existiendo para las 2 pestañas que no tienen un
 // documento real propio (Envíos y Técnicos). Los 5 documentos reales viven
@@ -262,7 +262,7 @@ function filaIncidencia(i: {
   fechaResuelta: Date | null;
 }): (string | number)[] {
   return [
-    i.origen === "DESK" ? "Desk" : "Manual",
+    etiquetaOrigenIncidencia(i.origen),
     i.ticketExternoId || "",
     i.titulo,
     TIPO_INCIDENCIA_LABELS[i.tipo as keyof typeof TIPO_INCIDENCIA_LABELS] || i.tipo,

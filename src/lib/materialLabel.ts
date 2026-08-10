@@ -10,3 +10,10 @@ export function etiquetaTipo(material: { tipo: string; tipoPersonalizado?: strin
   }
   return TIPO_MATERIAL_LABELS[material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || material.tipo;
 }
+
+/** Etiqueta legible del origen de una incidencia, para exportaciones. */
+export function etiquetaOrigenIncidencia(origen: string): string {
+  if (origen === "DESK") return "Desk";
+  if (origen === "HARDWARE") return "Pantalla desconectada";
+  return "Manual";
+}

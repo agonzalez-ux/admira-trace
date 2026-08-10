@@ -423,6 +423,11 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
                     {inc.origen === "DESK" && (
                       <span className="text-[11px] bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5">Desk</span>
                     )}
+                    {inc.origen === "HARDWARE" && (
+                      <span className="text-[11px] bg-rose-100 text-rose-700 rounded-full px-2 py-0.5">
+                        Pantalla desconectada
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
                     {inc.ticketExternoId && <>Ticket {inc.ticketExternoId} · </>}

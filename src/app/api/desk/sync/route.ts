@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { syncDeskTickets, DESK_CONFIGURED } from "@/lib/desk";
+import { syncHardwareDesconectado, HARDWARE_SYNC_CONFIGURADO } from "@/lib/hardwareSync";
 
 export async function POST() {
   const session = await getSession();
@@ -13,7 +14,16 @@ export async function POST() {
 
   try {
     const resultado = await syncDeskTickets(true);
-    return NextResponse.json({ ok: true, ...resultado });
+    let nuevas = resultado.nuevas;
+    let actualizadas = resultado.actualizadas;
+
+    if (HARDWARE_SYNC_CONFIGURADO) {
+      const hw = await syncHardwareDesconectado(true);
+      nuevas += hw.nuevas;
+      actualizadas += hw.actualizadas;
+    }
+
+    return NextResponse.json({ ok: true, nuevas, actualizadas });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || "Error al sincronizar con el desk." }, { status: 502 });
   }

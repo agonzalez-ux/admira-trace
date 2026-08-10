@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { syncDeskTickets } from "@/lib/desk";
+import { syncHardwareDesconectado } from "@/lib/hardwareSync";
 import { matchEstanco } from "@/lib/estancoMatch";
 import { iniciarScheduler } from "@/lib/scheduler";
 
@@ -22,6 +23,11 @@ export async function GET() {
       await syncDeskTickets();
     } catch (err) {
       console.error("[desk-sync] Error sincronizando tickets del desk:", err);
+    }
+    try {
+      await syncHardwareDesconectado();
+    } catch (err) {
+      console.error("[hardware-sync] Error sincronizando pantallas desconectadas:", err);
     }
     syncToSheets("estancos").catch((err) => console.error("[google-sheets] Error sincronizando estancos:", err));
   }
