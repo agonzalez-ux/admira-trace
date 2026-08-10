@@ -1,0 +1,1 @@
+# Esta carpeta debe existir siempre, aunque esté vacía: la usa el Dockerfile para copiar los assets estáticos de Next.js. Las fotos van a public/uploads (ignorado en git) o a Cloudinary en producción.
