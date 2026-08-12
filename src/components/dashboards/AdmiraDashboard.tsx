@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Tabs from "@/components/Tabs";
 import MaterialOverview from "@/components/materiales/MaterialOverview";
 import MaterialCreateForm from "@/components/materiales/MaterialCreateForm";
@@ -50,6 +51,21 @@ export default function AdmiraDashboard() {
           ),
         },
         { key: "tecnicos", label: "Técnicos", content: <TecnicosList /> },
+        {
+          key: "importar",
+          label: "Importar",
+          content: (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-900">
+                  ℹ️ Accede a <Link href="/admira/importar-datos" className="font-semibold underline hover:text-blue-700">
+                    la página de importación completa
+                  </Link> para subir archivos Excel de comerciales e instalaciones.
+                </p>
+              </div>
+            </div>
+          ),
+        },
         { key: "export", label: "Exportar", content: <ExportButtons /> },
       ]}
     />

@@ -76,6 +76,10 @@ model User {
   materialEventos   MaterialEvento[]
   ordenesRecurrentes OrdenRecurrente[] @relation("OrdenRecurrenteTecnico")
   ordenesCreadas     OrdenRecurrente[] @relation("OrdenRecurrenteCreadoPor")
+
+  // Historial de importaciones de datos
+  estancoImportaciones EstancoImportHistory[] @relation("EstancoImportaciones")
+  instalacionImportaciones InstalacionImportHistory[] @relation("InstalacionImportaciones")
 }
 
 // Token de un solo uso para restablecer la contraseña por email.
@@ -258,4 +262,48 @@ model IncidenciaMaterial {
   materialId   String
   material     Material   @relation(fields: [materialId], references: [id])
   fecha        DateTime   @default(now())
+}
+
+// Historial de importaciones del Universo de Comerciales (estancos).
+// Se registra cada vez que se sube el Excel mensual.
+model EstancoImportHistory {
+  id                String   @id @default(cuid())
+  usuarioId         String
+  usuario           User     @relation("EstancoImportaciones", fields: [usuarioId], references: [id])
+  fechaImportacion  DateTime @default(now())
+
+  // Resumen de la importación
+  totalFilas        Int      // Total de filas procesadas del Excel
+  estancosCreados   Int      // Nuevos estancos
+  estancosActualizados Int  // Estancos existentes que cambiaron
+  estancosSaltados  Int      // Filas inválidas/incompletas
+
+  // Detalles
+  erroresValidacion String?  // JSON con errores encontrados
+  detalles          String?  // Notas del proceso
+
+  archivoNombre     String   // Nombre del archivo subido
+  createdAt         DateTime @default(now())
+}
+
+// Historial de importaciones de instalaciones semanales (Altadis).
+// Se registra cada vez que se sube el Excel de instalaciones del jueves.
+model InstalacionImportHistory {
+  id                String   @id @default(cuid())
+  usuarioId         String
+  usuario           User     @relation("InstalacionImportaciones", fields: [usuarioId], references: [id])
+  fechaImportacion  DateTime @default(now())
+
+  // Resumen de la importación
+  totalFilas        Int      // Total de filas procesadas del Excel
+  incidenciasCreadas Int     // Nuevas incidencias generadas
+  incidenciasActualizadas Int // Incidencias existentes que cambiaron estado
+  instalacionesSaltadas Int    // Filas inválidas/incompletas
+
+  // Detalles
+  erroresValidacion String?  // JSON con errores encontrados
+  detalles          String?  // Notas del proceso
+
+  archivoNombre     String   // Nombre del archivo subido
+  createdAt         DateTime @default(now())
 }
