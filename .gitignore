@@ -13,3 +13,5 @@ Clave/
 *.json.key
 admira-trace-*.json
 credenciales-tecnicos.tsv
+Tecnico-Cerca-main.zip
+scripts/tecnico_cerca.sqlite
