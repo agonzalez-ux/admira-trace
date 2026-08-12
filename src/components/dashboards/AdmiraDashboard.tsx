@@ -11,6 +11,7 @@ import IncidenciasBoard from "@/components/incidencias/IncidenciasBoard";
 import IncidenciaCreateForm from "@/components/incidencias/IncidenciaCreateForm";
 import ExportButtons from "@/components/ExportButtons";
 import TecnicosList from "@/components/tecnicos/TecnicosList";
+import CleanupPanel from "@/components/admin/CleanupPanel";
 
 export default function AdmiraDashboard() {
   const [materialKey, setMaterialKey] = useState(0);
@@ -67,6 +68,11 @@ export default function AdmiraDashboard() {
           ),
         },
         { key: "export", label: "Exportar", content: <ExportButtons /> },
+        {
+          key: "mantenimiento",
+          label: "🔧 Mantenimiento",
+          content: <CleanupPanel />,
+        },
       ]}
     />
   );
