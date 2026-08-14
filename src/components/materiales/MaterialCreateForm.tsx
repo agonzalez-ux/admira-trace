@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { TIPOS_MATERIAL, TIPO_MATERIAL_LABELS, ESTADO_MATERIAL_LABELS } from "@/lib/constants";
-import BarcodeScanner from "@/components/BarcodeScanner";
+import SerialNumberScanner from "@/components/SerialNumberScanner";
 
 type Duplicado = {
   codigoBarras: string;
@@ -211,11 +211,14 @@ export default function MaterialCreateForm({
       </button>
 
       {scanning && (
-        <BarcodeScanner
-          onScan={(code) => {
-            setCodigoBarras(code);
+        <SerialNumberScanner
+          onScan={(numeroExtraido) => {
+            setNumeroSerie(numeroExtraido);
             setScanning(false);
-            rellenarDesdeCodigo(code);
+            // Si no hay código de barras, generar uno basado en el número de serie
+            if (!codigoBarras && numeroExtraido) {
+              setCodigoBarras(numeroExtraido.replace(/\s/g, "").substring(0, 20));
+            }
           }}
           onClose={() => setScanning(false)}
         />

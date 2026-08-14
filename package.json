@@ -11,6 +11,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
     "@libsql/client": "0.8.1",
     "@prisma/adapter-libsql": "5.22.0",
     "@prisma/client": "^5.20.0",
@@ -22,13 +23,16 @@
     "html5-qrcode": "^2.3.8",
     "jose": "^5.9.6",
     "next": "14.2.15",
+    "node-cron": "^4.6.0",
     "nodemailer": "^9.0.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.10",
+    "@types/node-cron": "^3.0.11",
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",

@@ -13,3 +13,7 @@ Clave/
 *.json.key
 admira-trace-*.json
 credenciales-tecnicos.tsv
+credenciales-*.tsv
+tsconfig.tsbuildinfo
+Tecnico-Cerca-main.zip
+scripts/tecnico_cerca.sqlite

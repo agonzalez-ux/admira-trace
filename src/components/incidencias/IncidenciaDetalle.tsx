@@ -6,6 +6,8 @@ import {
   TIPO_INCIDENCIA_LABELS,
   TIPO_MATERIAL_LABELS,
 } from "@/lib/constants";
+import WhatsAppButton from "./WhatsAppButton";
+import { obtenerNumeroWhatsAppRotativo, generarMensajeInstalacion } from "@/lib/whatsapp";
 
 export type IncidenciaDetalleData = {
   id: string;
@@ -275,6 +277,24 @@ export default function IncidenciaDetalle({
 
             {!inc.estanco && role === "ADMIRA" && onActualizada && (
               <VincularEstanco incidenciaId={inc.id} onVinculado={onActualizada} />
+            )}
+
+            {/* Botón de WhatsApp para instalaciones */}
+            {inc.tipo === "INSTALACION_NUEVA" && inc.tecnico && role === "ADMIRA" && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <p className="text-xs text-emerald-800 mb-2">
+                  💬 Avisar al técnico por WhatsApp para que envíe la foto del QR de Admira:
+                </p>
+                <WhatsAppButton
+                  phone={obtenerNumeroWhatsAppRotativo(inc.id)}
+                  text={generarMensajeInstalacion({
+                    tecnicoNombre: inc.tecnico.name,
+                    estancoNombre: inc.estanco?.nombre,
+                    estancoDireccion: inc.direccion,
+                  })}
+                  label="📤 Enviar por WhatsApp"
+                />
+              </div>
             )}
 
             {inc.descripcion && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import BarcodeScanner from "@/components/BarcodeScanner";
+import SerialNumberScanner from "@/components/SerialNumberScanner";
 import {
   ESTADO_ENVIO_LABELS,
   TIPO_MATERIAL_LABELS,
@@ -223,7 +223,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
         );
       })}
       {scanTarget && (
-        <BarcodeScanner
+        <SerialNumberScanner
           onScan={handleScan}
           onClose={() => setScanTarget(null)}
         />
