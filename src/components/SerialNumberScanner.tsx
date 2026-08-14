@@ -7,13 +7,45 @@ type Props = {
   onClose: () => void;
 };
 
+/**
+ * Intenta encontrar el número de serie dentro del texto crudo que devuelve el OCR.
+ *
+ * 1) Si aparece justo después de una palabra clave típica de etiqueta (S/N, SERIE,
+ *    REF, CÓDIGO...), nos quedamos con lo que sigue: es la señal más fiable.
+ * 2) Si no, buscamos el token alfanumérico que más se parece a un número de serie
+ *    (mezcla de letras y números) y nos quedamos con el más largo.
+ *
+ * Nunca es tan fiable como pedírselo a un modelo de visión, así que el resultado
+ * siempre se muestra en un campo editable para que el técnico lo revise/corrija.
+ */
+function extraerCandidato(textoCrudo: string): { valor: string; tipo: string } | null {
+  const texto = textoCrudo.toUpperCase();
+
+  const conPalabraClave = texto.match(
+    /(?:S\/?N|SERIE|SERIAL|N[ºO]\s*SERIE|REF(?:ERENCIA)?|C[OÓ]DIGO)[:\s.-]*([A-Z0-9][A-Z0-9-]{3,})/
+  );
+  if (conPalabraClave) {
+    return { valor: conPalabraClave[1].replace(/[^A-Z0-9-]/g, ""), tipo: "serie" };
+  }
+
+  const tokens = texto.match(/[A-Z0-9-]{5,}/g) || [];
+  const conLetrasYNumeros = tokens.filter((t) => /[A-Z]/.test(t) && /[0-9]/.test(t));
+  const candidatos = conLetrasYNumeros.length > 0 ? conLetrasYNumeros : tokens;
+  if (candidatos.length === 0) return null;
+
+  candidatos.sort((a, b) => b.length - a.length);
+  return { valor: candidatos[0], tipo: "detectado" };
+}
+
 export default function SerialNumberScanner({ onScan, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [estado, setEstado] = useState<"camara" | "procesando" | "resultado">("camara");
   const [error, setError] = useState<string | null>(null);
-  const [numeroSerie, setNumeroSerie] = useState<string | null>(null);
+  const [numeroSerie, setNumeroSerie] = useState("");
   const [tipoNumero, setTipoNumero] = useState<string | null>(null);
+  const [textoCompleto, setTextoCompleto] = useState("");
+  const [mostrarTextoCompleto, setMostrarTextoCompleto] = useState(false);
 
   // Inicializar cámara
   useEffect(() => {
@@ -58,59 +90,54 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
     // Dibujar frame actual del video en el canvas
     context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
 
-    // Convertir canvas a blob
-    canvasRef.current.toBlob(
-      async (blob) => {
-        if (!blob) {
-          setError("Error capturando foto");
-          return;
-        }
+    setEstado("procesando");
+    setError(null);
 
-        setEstado("procesando");
-        setError(null);
+    try {
+      // Tesseract.js: OCR gratuito y de código abierto que corre en el propio
+      // navegador del técnico. No se sube ninguna foto a ningún servidor ni
+      // hace falta clave de API.
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
+      const {
+        data: { text },
+      } = await worker.recognize(canvasRef.current);
+      await worker.terminate();
 
-        try {
-          // Enviar foto al servidor
-          const formData = new FormData();
-          formData.append("imagen", blob, "foto.jpg");
+      const textoLimpio = text.trim();
+      setTextoCompleto(textoLimpio);
 
-          const res = await fetch("/api/materiales/extraer-numero-serie", {
-            method: "POST",
-            body: formData,
-          });
-
-          const data = await res.json();
-
-          if (!res.ok) {
-            setError(data.error || "Error extrayendo número de serie");
-            setEstado("camara");
-            return;
-          }
-
-          // Mostrar resultado
-          setNumeroSerie(data.numeroSerie);
-          setTipoNumero(data.tipo);
-          setEstado("resultado");
-        } catch (err) {
-          setError("Error comunicando con el servidor");
-          setEstado("camara");
-        }
-      },
-      "image/jpeg",
-      0.9
-    );
+      const candidato = extraerCandidato(textoLimpio);
+      if (!candidato) {
+        setError(
+          "No se detectó texto claro en la foto. Escribe el número a mano abajo, o vuelve a intentarlo con mejor luz/encuadre."
+        );
+        setNumeroSerie("");
+        setTipoNumero(null);
+      } else {
+        setNumeroSerie(candidato.valor);
+        setTipoNumero(candidato.tipo);
+      }
+      setEstado("resultado");
+    } catch (err) {
+      setError("Error leyendo la foto: " + (err instanceof Error ? err.message : "desconocido"));
+      setEstado("camara");
+    }
   };
 
   const aceptarNumero = () => {
-    if (numeroSerie) {
-      onScan(numeroSerie);
+    const valor = numeroSerie.trim();
+    if (valor) {
+      onScan(valor);
     }
   };
 
   const reintentar = () => {
     setEstado("camara");
-    setNumeroSerie(null);
+    setNumeroSerie("");
     setTipoNumero(null);
+    setTextoCompleto("");
+    setMostrarTextoCompleto(false);
     setError(null);
   };
 
@@ -120,13 +147,10 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">
             {estado === "camara" && "Capturar número de serie"}
-            {estado === "procesando" && "Analizando foto..."}
-            {estado === "resultado" && "Número de serie extraído"}
+            {estado === "procesando" && "Leyendo foto..."}
+            {estado === "resultado" && "Número de serie detectado"}
           </h3>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-xl leading-none"
-          >
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">
             ×
           </button>
         </div>
@@ -135,15 +159,10 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
         {estado === "camara" && (
           <>
             <div className="relative bg-black rounded-lg overflow-hidden aspect-video mb-3">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
+              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
               <div className="absolute inset-0 border-2 border-yellow-400 opacity-50" />
               <div className="absolute bottom-3 left-0 right-0 text-center text-white text-xs bg-black/50 py-2">
-                Encuadra el número de serie en el centro
+                Encuadra el número de serie en el centro, bien enfocado
               </div>
             </div>
 
@@ -173,31 +192,60 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
         {estado === "procesando" && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-3" />
-            <p className="text-sm text-slate-600">Extrayendo número de serie...</p>
-            <p className="text-xs text-slate-400 mt-2">
-              Utilizando visión artificial para leer la etiqueta
-            </p>
+            <p className="text-sm text-slate-600">Leyendo la etiqueta...</p>
+            <p className="text-xs text-slate-400 mt-2">OCR gratuito, en tu propio dispositivo</p>
           </div>
         )}
 
         {/* ESTADO: RESULTADO */}
         {estado === "resultado" && (
           <>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3">
-              <p className="text-xs text-emerald-600 mb-2">✅ Número extraído correctamente</p>
-              <div className="bg-white rounded-lg p-2 border border-emerald-100">
-                <p className="text-xs text-slate-600 mb-1">
-                  <span className="font-semibold capitalize">{tipoNumero}:</span>
-                </p>
-                <p className="text-lg font-mono font-bold text-emerald-700 break-all">
-                  {numeroSerie}
+            {tipoNumero ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3">
+                <p className="text-xs text-emerald-600">
+                  {tipoNumero === "serie"
+                    ? "✅ Detectado junto a una etiqueta reconocible (S/N, SERIE, REF...)"
+                    : "🔎 Mejor texto detectado — revísalo antes de aceptar"}
                 </p>
               </div>
-            </div>
+            ) : (
+              error && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                  <p className="text-xs text-amber-700">{error}</p>
+                </div>
+              )
+            )}
+
+            <label className="block text-xs text-slate-500 mb-1">
+              Número de serie (revisa y corrige si hace falta)
+            </label>
+            <input
+              value={numeroSerie}
+              onChange={(e) => setNumeroSerie(e.target.value.toUpperCase())}
+              placeholder="Escribe o corrige el número aquí"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono mb-2"
+              autoFocus
+            />
+
+            {textoCompleto && (
+              <button
+                type="button"
+                onClick={() => setMostrarTextoCompleto((v) => !v)}
+                className="text-[11px] text-admira-600 hover:underline mb-2"
+              >
+                {mostrarTextoCompleto ? "Ocultar" : "Ver"} todo el texto detectado
+              </button>
+            )}
+            {mostrarTextoCompleto && (
+              <div className="bg-slate-50 rounded-lg p-2 mb-2 text-[11px] text-slate-500 whitespace-pre-wrap max-h-24 overflow-y-auto">
+                {textoCompleto || "(sin texto)"}
+              </div>
+            )}
 
             <button
               onClick={aceptarNumero}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition mb-2"
+              disabled={!numeroSerie.trim()}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition mb-2 disabled:opacity-50"
             >
               ✓ Aceptar
             </button>
@@ -212,12 +260,7 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
         )}
 
         {/* Canvas invisible para capturar frames */}
-        <canvas
-          ref={canvasRef}
-          width={1280}
-          height={720}
-          className="hidden"
-        />
+        <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
       </div>
     </div>
   );
