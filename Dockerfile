@@ -20,6 +20,11 @@ COPY . .
 # DATABASE_URL solo se usa aquí para que `prisma generate` no falle; la real
 # llega por variable de entorno en tiempo de ejecución.
 ENV DATABASE_URL="file:./build.db"
+# En hostings con poca RAM (p. ej. un VPS pequeño), la comprobación de tipos de
+# `next build` puede agotar el heap por defecto de Node y morir a mitad de
+# build sin generar .next/standalone (con un fallo de OOM que no siempre se ve
+# claro en el log). Se le da más margen de heap explícitamente.
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 RUN npx prisma generate && npm run build
 
 # --- Ejecución --------------------------------------------------------------

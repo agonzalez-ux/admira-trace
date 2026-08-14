@@ -51,7 +51,7 @@ function primerEmail(celda: string): string {
 /**
  * Usuario derivado del nombre de la empresa (no del email): es mucho más
  * reconocible para el técnico que "sat" o "comercial", que además se repiten
- * mucho entre proveedores distintos.
+ * mucho entre proveedores distintos. Solo letras y números, sin separadores.
  */
 async function generarUsername(empresa: string, usados: Set<string>): Promise<string> {
   const base =
@@ -59,9 +59,8 @@ async function generarUsername(empresa: string, usados: Set<string>): Promise<st
       .toLowerCase()
       .normalize("NFD")
       .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, ".")
-      .replace(/^\.+|\.+$/g, "")
-      .slice(0, 28) || "tecnico";
+      .replace(/[^a-z0-9]+/g, "")
+      .slice(0, 20) || "tecnico";
   let candidato = base;
   let n = 2;
   while (usados.has(candidato) || (await prisma.user.findUnique({ where: { username: candidato } }))) {
