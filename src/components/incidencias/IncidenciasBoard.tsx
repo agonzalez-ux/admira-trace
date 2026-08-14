@@ -118,12 +118,39 @@ function BandejaSinAsignar({
   const [asignando, setAsignando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tecnicosBase, setTecnicosBase] = useState<Tecnico[]>([]);
+  const [ventanaDias, setVentanaDias] = useState<number | null>(null);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [mensajeMostrarMas, setMensajeMostrarMas] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/tecnicos")
       .then((r) => r.json())
       .then((d) => setTecnicosBase(d.tecnicos || []));
+    fetch("/api/desk/sync")
+      .then((r) => r.json())
+      .then((d) => setVentanaDias(d.ventanaDias ?? null));
   }, []);
+
+  async function mostrarMas() {
+    setCargandoMas(true);
+    setMensajeMostrarMas(null);
+    const res = await fetch("/api/desk/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ampliarVentana: true }),
+    });
+    const data = await res.json();
+    setCargandoMas(false);
+    if (!res.ok) {
+      setMensajeMostrarMas(data.error || "Error al pedir más tickets del desk.");
+      return;
+    }
+    setVentanaDias(data.ventanaDias ?? null);
+    setMensajeMostrarMas(
+      data.nuevas > 0 ? `Se han traído ${data.nuevas} tickets más antiguos.` : "No hay tickets más antiguos que traer."
+    );
+    onAsignado();
+  }
 
   async function asignar(id: string) {
     const tecnicoId = seleccion[id];
@@ -147,15 +174,39 @@ function BandejaSinAsignar({
     onAsignado();
   }
 
+  const botonMostrarMas = (
+    <div className="mt-3 text-center">
+      <button
+        onClick={mostrarMas}
+        disabled={cargandoMas}
+        className="text-xs font-medium bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-2 disabled:opacity-60"
+      >
+        {cargandoMas ? "Buscando tickets más antiguos…" : "⬇️ Mostrar más"}
+      </button>
+      {ventanaDias != null && (
+        <p className="text-[11px] text-slate-400 mt-1">
+          Mostrando tickets de los últimos {ventanaDias} días. Pulsa para traer más antiguos.
+        </p>
+      )}
+      {mensajeMostrarMas && <p className="text-[11px] text-amber-700 mt-1">{mensajeMostrarMas}</p>}
+    </div>
+  );
+
   if (incidencias.length === 0) {
-    return <p className="text-sm text-slate-400 py-6 text-center">No hay incidencias sin asignar.</p>;
+    return (
+      <div>
+        <p className="text-sm text-slate-400 py-6 text-center">No hay incidencias sin asignar.</p>
+        {botonMostrarMas}
+      </div>
+    );
   }
 
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
       <p className="text-xs text-amber-700 mb-3">
-        Tickets importados automáticamente que requieren visita in situ. El selector propone primero los técnicos más
-        cercanos al estanco, con la distancia aproximada.
+        Tickets importados automáticamente que requieren visita in situ (solo del último mes; usa "Mostrar más" para
+        traer tickets más antiguos). El selector propone primero los técnicos más cercanos al estanco, con la
+        distancia aproximada.
       </p>
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
       <div className="space-y-2">
@@ -198,6 +249,7 @@ function BandejaSinAsignar({
           </div>
         ))}
       </div>
+      {botonMostrarMas}
     </div>
   );
 }

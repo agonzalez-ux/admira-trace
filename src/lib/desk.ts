@@ -72,11 +72,44 @@ export const DESK_CONFIGURED = Boolean(DESK_API_TOKEN);
 let lastSyncAt = 0;
 const MIN_SYNC_INTERVAL_MS = 60_000; // no más de una sincronización por minuto
 
+// Ventana de antigüedad para IMPORTAR tickets nuevos como Incidencia: por
+// defecto, solo el último mes. El botón "Mostrar más" de la bandeja "Sin
+// asignar" la va ampliando de 30 en 30 días para traer tickets más antiguos
+// bajo demanda, en vez de importar de golpe todo el histórico activo del
+// desk en cada sincronización automática. No afecta a las incidencias que
+// ya existen: esas se siguen actualizando siempre, tengan la antigüedad que
+// tengan.
+const VENTANA_INICIAL_DIAS = 30;
+const VENTANA_INCREMENTO_DIAS = 30;
+let ventanaDiasActual = VENTANA_INICIAL_DIAS;
+
+export function obtenerVentanaDeskDias(): number {
+  return ventanaDiasActual;
+}
+
+/** Amplía la ventana de importación (la llama el botón "Mostrar más"). */
+export function ampliarVentanaDeskDias(): number {
+  ventanaDiasActual += VENTANA_INCREMENTO_DIAS;
+  return ventanaDiasActual;
+}
+
+function dentroDeVentana(fechaInsertadaISO: string | undefined, dias: number): boolean {
+  if (!fechaInsertadaISO) return true; // sin fecha: no descartamos por seguridad
+  const fecha = new Date(fechaInsertadaISO);
+  if (Number.isNaN(fecha.getTime())) return true;
+  const limiteMs = Date.now() - dias * 24 * 60 * 60 * 1000;
+  return fecha.getTime() >= limiteMs;
+}
+
 /**
  * Importa como Incidencia (origen "DESK") los tickets activos que requieren
  * visita in situ en los proyectos Altadis configurados. No asigna técnico:
  * quedan en estado SIN_ASIGNAR hasta que Admira elige el técnico desde la app.
  * No se toca ninguna incidencia que ya tenga técnico asignado.
+ *
+ * Los tickets NUEVOS (que aún no existen como Incidencia) solo se importan si
+ * están dentro de `obtenerVentanaDeskDias()` días; los más antiguos se ignoran
+ * hasta que se pulse "Mostrar más" y la ventana se amplíe.
  */
 export async function syncDeskTickets(force = false): Promise<{ nuevas: number; actualizadas: number }> {
   if (!DESK_CONFIGURED) return { nuevas: 0, actualizadas: 0 };
@@ -89,6 +122,7 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
 
   let nuevas = 0;
   let actualizadas = 0;
+  const ventanaDias = ventanaDiasActual;
 
   for (const proyecto of DESK_ALTADIS_PROJECTS) {
     // OJO: el parámetro "project" de /api/ticket/search espera el campo "id" del
@@ -106,6 +140,7 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
       ].filter(Boolean);
 
       if (!existente) {
+        if (!dentroDeVentana(t.inserted, ventanaDias)) continue;
         const match = await matchEstanco(t.ticketName || t.subject || "");
         await prisma.incidencia.create({
           data: {
