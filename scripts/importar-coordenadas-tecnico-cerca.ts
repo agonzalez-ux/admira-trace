@@ -15,7 +15,12 @@
  * Uso: npx tsx scripts/importar-coordenadas-tecnico-cerca.ts [ruta al .sqlite]
  * (por defecto usa scripts/tecnico_cerca.sqlite)
  */
-import { DatabaseSync } from "node:sqlite";
+// Se usa @libsql/client (ya es dependencia del proyecto, para Turso) en vez de
+// node:sqlite: ese módulo es experimental desde Node 22+ y no existe en la
+// imagen Docker de producción (node:20-slim), así que este script no podría
+// ejecutarse ahí. @libsql/client sabe abrir también ficheros .sqlite locales
+// (no solo bases remotas de Turso), y es compatible con Node 20.
+import { createClient } from "@libsql/client";
 import path from "node:path";
 // Cliente compartido: si están las variables TURSO_DATABASE_URL/TURSO_AUTH_TOKEN
 // en el entorno, escribe directamente en Turso; si no, en el fichero local.
@@ -45,14 +50,13 @@ async function main() {
   const dbPath = process.argv[2] || path.join(__dirname, "tecnico_cerca.sqlite");
   console.log(`Leyendo coordenadas ya geocodificadas de: ${dbPath}`);
 
-  const db = new DatabaseSync(dbPath, { readOnly: true });
+  const db = createClient({ url: `file:${dbPath}` });
 
   // --- Estancos: cruce directo por id_estanco (misma referencia que en Admira Trace) ---
-  const estancosZip = db
-    .prepare(
-      "SELECT id_estanco, latitud, longitud FROM estancos WHERE latitud IS NOT NULL AND longitud IS NOT NULL",
-    )
-    .all() as { id_estanco: string; latitud: number; longitud: number }[];
+  const estancosZipResult = await db.execute(
+    "SELECT id_estanco, latitud, longitud FROM estancos WHERE latitud IS NOT NULL AND longitud IS NOT NULL",
+  );
+  const estancosZip = estancosZipResult.rows as unknown as { id_estanco: string; latitud: number; longitud: number }[];
 
   console.log(`\nEstancos geocodificados en el zip: ${estancosZip.length}`);
 
@@ -83,11 +87,10 @@ async function main() {
   );
 
   // --- Técnicos: cruce por nombre de empresa normalizado, con email como respaldo ---
-  const tecnicosZip = db
-    .prepare(
-      "SELECT empresa, email, latitud, longitud FROM tecnicos WHERE latitud IS NOT NULL AND longitud IS NOT NULL",
-    )
-    .all() as { empresa: string; email: string | null; latitud: number; longitud: number }[];
+  const tecnicosZipResult = await db.execute(
+    "SELECT empresa, email, latitud, longitud FROM tecnicos WHERE latitud IS NOT NULL AND longitud IS NOT NULL",
+  );
+  const tecnicosZip = tecnicosZipResult.rows as unknown as { empresa: string; email: string | null; latitud: number; longitud: number }[];
 
   console.log(`\nTécnicos geocodificados en el zip: ${tecnicosZip.length}`);
 

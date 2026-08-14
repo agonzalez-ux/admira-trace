@@ -34,15 +34,30 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     });
   }
 
-  const conDistancia = [];
-  for (const t of tecnicos) {
-    const coordsT = t.lat !== null && t.lon !== null ? { lat: t.lat, lon: t.lon } : await asegurarCoordsTecnico(t.id);
-    conDistancia.push({
-      id: t.id,
-      name: t.name,
-      zona: t.zona,
-      distanciaKm: coordsT ? Math.round(distanciaKm(coordsIncidencia, coordsT)) : null,
-    });
+  // OJO: NO se geocodifica aquí a los técnicos que no tengan coordenadas.
+  // Nominatim solo admite 1 petición/segundo, así que con muchos técnicos sin
+  // coordenadas la petición se quedaría colgada varios minutos. Se calcula la
+  // distancia solo con lo que ya está guardado (rápido) y, en segundo plano
+  // sin bloquear la respuesta, se van geocodificando los que faltan para que
+  // las próximas veces salgan ya con distancia.
+  const conDistancia = tecnicos.map((t) => ({
+    id: t.id,
+    name: t.name,
+    zona: t.zona,
+    distanciaKm: t.lat !== null && t.lon !== null ? Math.round(distanciaKm(coordsIncidencia, { lat: t.lat, lon: t.lon })) : null,
+  }));
+
+  const sinCoords = tecnicos.filter((t) => t.lat === null || t.lon === null);
+  if (sinCoords.length > 0) {
+    (async () => {
+      for (const t of sinCoords) {
+        try {
+          await asegurarCoordsTecnico(t.id);
+        } catch (err) {
+          console.error("[tecnicos-cercanos] Error geocodificando técnico en segundo plano:", t.id, err);
+        }
+      }
+    })();
   }
 
   // Los que tienen distancia conocida primero, de más cerca a más lejos.

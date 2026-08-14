@@ -102,6 +102,21 @@ function dentroDeVentana(fechaInsertadaISO: string | undefined, dias: number): b
 }
 
 /**
+ * Comprobación de seguridad además del parámetro `performance` ya enviado en
+ * la petición: si el desk devolviera algún ticket que no sea de "Asistencia
+ * Admira in situ" (p. ej. porque ignorase el filtro), no lo importamos como
+ * Incidencia — esta app es para gestionar visitas físicas de técnicos, no
+ * incidencias resueltas en remoto.
+ */
+function requiereTecnicoInSitu(t: DeskTicket): boolean {
+  const nombre = (t.performance_name || "").toLowerCase();
+  if (!nombre) return true; // sin dato: ya viene filtrado por el parámetro de la petición
+  if (nombre.includes("in situ") || nombre.includes("presencial")) return true;
+  if (nombre.includes("remot")) return false; // "remoto/a": no requiere desplazamiento físico
+  return true; // valor desconocido: por precaución no lo descartamos
+}
+
+/**
  * Importa como Incidencia (origen "DESK") los tickets activos que requieren
  * visita in situ en los proyectos Altadis configurados. No asigna técnico:
  * quedan en estado SIN_ASIGNAR hasta que Admira elige el técnico desde la app.
@@ -140,6 +155,7 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
       ].filter(Boolean);
 
       if (!existente) {
+        if (!requiereTecnicoInSitu(t)) continue;
         if (!dentroDeVentana(t.inserted, ventanaDias)) continue;
         const match = await matchEstanco(t.ticketName || t.subject || "");
         await prisma.incidencia.create({
