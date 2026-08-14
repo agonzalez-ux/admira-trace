@@ -62,8 +62,9 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Buscar si la incidencia ya existe por SR (ticketExternoId)
-        const incidenciaExistente = await prisma.incidencia.findUnique({
+        // Buscar si la incidencia ya existe por SR (ticketExternoId). No es un
+        // campo único en el esquema, así que se busca con findFirst.
+        const incidenciaExistente = await prisma.incidencia.findFirst({
           where: { ticketExternoId: fila.sr },
         });
 
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
     // Registrar importación
     await prisma.instalacionImportHistory.create({
       data: {
-        usuarioId: session.id,
+        usuarioId: session.userId,
         totalFilas: filas.length,
         incidenciasCreadas,
         incidenciasActualizadas,

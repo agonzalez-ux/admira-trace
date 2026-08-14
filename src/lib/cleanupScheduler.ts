@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { promisify } from "util";
 import cron from "node-cron";
+import type { ScheduledTask } from "node-cron";
 
 const copyFile = promisify(fs.copyFile);
 const unlink = promisify(fs.unlink);
@@ -190,7 +191,7 @@ export function segundosHastaProximoReset(): number {
   return Math.max(0, Math.floor(diferencia / 1000));
 }
 
-let scheduledCleanup: cron.ScheduledTask | null = null;
+let scheduledCleanup: ScheduledTask | null = null;
 
 /**
  * Inicializa el scheduler de limpieza mensual.

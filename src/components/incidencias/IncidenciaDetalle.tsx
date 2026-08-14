@@ -290,7 +290,7 @@ export default function IncidenciaDetalle({
                   text={generarMensajeInstalacion({
                     tecnicoNombre: inc.tecnico.name,
                     estancoNombre: inc.estanco?.nombre,
-                    estancoDireccion: inc.direccion,
+                    estancoDireccion: inc.direccion ?? undefined,
                   })}
                   label="📤 Enviar por WhatsApp"
                 />

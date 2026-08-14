@@ -115,7 +115,7 @@ No incluyas explicaciones, solo la respuesta.`,
     }
 
     console.log(
-      `[extraer-numero-serie] Encontrado ${tipo}: "${numeroSerie}" (usuario: ${session.id})`
+      `[extraer-numero-serie] Encontrado ${tipo}: "${numeroSerie}" (usuario: ${session.userId})`
     );
 
     return NextResponse.json({

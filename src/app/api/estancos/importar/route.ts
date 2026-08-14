@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     // Registrar importación
     await prisma.estancoImportHistory.create({
       data: {
-        usuarioId: session.id,
+        usuarioId: session.userId,
         totalFilas: filas.length,
         estancosCreados,
         estancosActualizados,
