@@ -31,6 +31,13 @@ type DeskSearchResponse = {
   data: DeskTicket[];
 };
 
+// Sin esto, si el desk se queda colgado en una sola página (red lenta, API
+// bloqueada, etc.) toda la sincronización se queda esperando indefinidamente
+// — el botón "Sincronizar con el desk ahora" se quedaba en "Sincronizando…"
+// para siempre. Con esto, esa página falla a los 20s, el try/catch por
+// proyecto en syncDeskTickets() la salta, y el resto de proyectos siguen.
+const TIMEOUT_PETICION_DESK_MS = 20_000;
+
 async function fetchTicketsPage(projectId: number, page: number): Promise<DeskSearchResponse> {
   const params = new URLSearchParams({
     project: `[${projectId}]`,
@@ -43,6 +50,7 @@ async function fetchTicketsPage(projectId: number, page: number): Promise<DeskSe
   });
   const res = await fetch(`${DESK_API_BASE}/ticket/search?${params.toString()}`, {
     cache: "no-store",
+    signal: AbortSignal.timeout(TIMEOUT_PETICION_DESK_MS),
   });
   if (!res.ok) {
     throw new Error(`Desk API respondió ${res.status} para el proyecto ${projectId}`);

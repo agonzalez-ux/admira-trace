@@ -134,22 +134,28 @@ function BandejaSinAsignar({
   async function mostrarMas() {
     setCargandoMas(true);
     setMensajeMostrarMas(null);
-    const res = await fetch("/api/desk/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ampliarVentana: true }),
-    });
-    const data = await res.json();
-    setCargandoMas(false);
-    if (!res.ok) {
-      setMensajeMostrarMas(data.error || "Error al pedir más tickets del desk.");
-      return;
+    try {
+      const res = await fetch("/api/desk/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ampliarVentana: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMensajeMostrarMas(data.error || "Error al pedir más tickets del desk.");
+        return;
+      }
+      setVentanaDias(data.ventanaDias ?? null);
+      setMensajeMostrarMas(
+        data.nuevas > 0 ? `Se han traído ${data.nuevas} tickets más antiguos.` : "No hay tickets más antiguos que traer."
+      );
+      onAsignado();
+    } catch (err) {
+      console.error("[mostrar-mas] Error:", err);
+      setMensajeMostrarMas("No se pudo completar (tiempo de espera agotado o error de red). Inténtalo de nuevo.");
+    } finally {
+      setCargandoMas(false);
     }
-    setVentanaDias(data.ventanaDias ?? null);
-    setMensajeMostrarMas(
-      data.nuevas > 0 ? `Se han traído ${data.nuevas} tickets más antiguos.` : "No hay tickets más antiguos que traer."
-    );
-    onAsignado();
   }
 
   async function asignar(id: string) {
@@ -329,22 +335,31 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
 
   async function sincronizarDesk() {
     setSincronizando(true);
-    const res = await fetch("/api/desk/sync", { method: "POST" });
-    const data = await res.json();
-    setSincronizando(false);
-    // Aunque el desk falle, la parte de pantallas desconectadas puede haber
-    // funcionado igual (usa otra API): siempre se refresca la lista.
-    load();
-    if (!res.ok) {
-      setFeedback({
-        type: "error",
-        text: `${data.error || "Error al sincronizar con el desk."}${
-          data.nuevas || data.actualizadas ? ` (pantallas desconectadas: ${data.nuevas} nuevas, ${data.actualizadas} actualizadas)` : ""
-        }`,
-      });
-      return;
+    try {
+      const res = await fetch("/api/desk/sync", { method: "POST" });
+      const data = await res.json();
+      // Aunque el desk falle, la parte de pantallas desconectadas puede haber
+      // funcionado igual (usa otra API): siempre se refresca la lista.
+      load();
+      if (!res.ok) {
+        setFeedback({
+          type: "error",
+          text: `${data.error || "Error al sincronizar con el desk."}${
+            data.nuevas || data.actualizadas ? ` (pantallas desconectadas: ${data.nuevas} nuevas, ${data.actualizadas} actualizadas)` : ""
+          }`,
+        });
+        return;
+      }
+      setFeedback({ type: "ok", text: `Sincronizado: ${data.nuevas} nuevas, ${data.actualizadas} actualizadas.` });
+    } catch (err) {
+      // Antes, si el fetch fallaba (timeout, red caída…) esta excepción no se
+      // capturaba y el botón se quedaba en "Sincronizando…" para siempre, sin
+      // ningún mensaje. Ahora siempre se libera y se avisa del fallo.
+      console.error("[sincronizar-desk] Error:", err);
+      setFeedback({ type: "error", text: "No se pudo completar la sincronización (tiempo de espera agotado o error de red). Inténtalo de nuevo." });
+    } finally {
+      setSincronizando(false);
     }
-    setFeedback({ type: "ok", text: `Sincronizado: ${data.nuevas} nuevas, ${data.actualizadas} actualizadas.` });
   }
 
   async function setEstado(id: string, estado: "EN_CAMINO" | "RESUELTA") {
