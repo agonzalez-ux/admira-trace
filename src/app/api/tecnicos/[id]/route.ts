@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       materialesUsados: { include: { material: true } },
       tecnico: { select: { id: true, name: true, zona: true, phone: true } },
       creadoPor: { select: { name: true } },
-      estanco: { select: { nombre: true, comercial: true, correoComercial: true } },
+      estanco: { select: { nombre: true, comercial: true, telefonoComercial: true, correoComercial: true } },
     },
   });
 
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       materialesUsados: { include: { material: true } },
       tecnico: { select: { id: true, name: true, zona: true, phone: true } },
       creadoPor: { select: { name: true } },
-      estanco: { select: { nombre: true, comercial: true, correoComercial: true } },
+      estanco: { select: { nombre: true, comercial: true, telefonoComercial: true, correoComercial: true } },
     },
   });
 

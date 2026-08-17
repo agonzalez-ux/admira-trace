@@ -28,8 +28,9 @@ export function obtenerNumeroWhatsAppRotativo(incidenciaId: string): string {
 }
 
 /**
- * Genera el mensaje de WhatsApp para una instalación.
- * Incluye técnico, estanco, tipo de trabajo y solicitud de QR.
+ * Genera el mensaje de WhatsApp que el propio técnico envía a Admira al
+ * terminar una instalación, adjuntando la foto del QR. Va en primera
+ * persona porque quien lo manda es el técnico, no un tercero avisándole.
  */
 export function generarMensajeInstalacion({
   tecnicoNombre,
@@ -40,15 +41,15 @@ export function generarMensajeInstalacion({
   estancoNombre?: string;
   estancoDireccion?: string;
 }): string {
-  const tecnico = tecnicoNombre || '(Sin técnico asignado)';
-  const estanco = estancoNombre ? `${estancoNombre}` : '(Sin estanco vinculado)';
+  const tecnico = tecnicoNombre || '(técnico sin nombre)';
+  const estanco = estancoNombre ? `${estancoNombre}` : '(sin estanco vinculado)';
   const direccion = estancoDireccion ? ` - ${estancoDireccion}` : '';
 
-  return `👋 Hola,
+  return `👋 Hola, soy *${tecnico}*.
 
-El técnico *${tecnico}* está realizando una instalación en *${estanco}${direccion}*.
+He terminado la instalación en *${estanco}${direccion}*.
 
-Por favor, procede a pasar la foto del QR de Admira.
+Os adjunto la foto del QR de Admira.
 
 Gracias.`;
 }

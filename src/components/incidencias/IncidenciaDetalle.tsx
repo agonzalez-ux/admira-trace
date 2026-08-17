@@ -28,7 +28,12 @@ export type IncidenciaDetalleData = {
   fechaImportada?: string | null;
   tecnico: { id: string; name: string; zona: string | null; phone: string | null } | null;
   creadoPor?: { name: string } | null;
-  estanco?: { nombre: string; comercial: string | null; correoComercial: string | null } | null;
+  estanco?: {
+    nombre: string;
+    comercial: string | null;
+    telefonoComercial: string | null;
+    correoComercial: string | null;
+  } | null;
   fotos: { id: string; url: string }[];
   materialesUsados: { id: string; material: { codigoBarras: string; nombre: string; tipo: string } }[];
 };
@@ -264,10 +269,24 @@ export default function IncidenciaDetalle({
                       <dt className="text-slate-400">Comercial:</dt>
                       <dd className="text-slate-700">{inc.estanco.comercial || "—"}</dd>
                     </div>
+                    {inc.estanco.telefonoComercial && (
+                      <div className="flex gap-1">
+                        <dt className="text-slate-400">Teléfono comercial:</dt>
+                        <dd className="text-slate-700">
+                          <a href={`tel:${inc.estanco.telefonoComercial}`} className="text-admira-600 hover:underline">
+                            {inc.estanco.telefonoComercial}
+                          </a>
+                        </dd>
+                      </div>
+                    )}
                     {inc.estanco.correoComercial && (
                       <div>
                         <dt className="text-slate-400">Email comercial:</dt>
-                        <dd className="text-slate-700 break-all">{inc.estanco.correoComercial}</dd>
+                        <dd className="text-slate-700 break-all">
+                          <a href={`mailto:${inc.estanco.correoComercial}`} className="text-admira-600 hover:underline">
+                            {inc.estanco.correoComercial}
+                          </a>
+                        </dd>
                       </div>
                     )}
                   </>
@@ -279,11 +298,12 @@ export default function IncidenciaDetalle({
               <VincularEstanco incidenciaId={inc.id} onVinculado={onActualizada} />
             )}
 
-            {/* Botón de WhatsApp para instalaciones */}
-            {inc.tipo === "INSTALACION_NUEVA" && inc.tecnico && role === "ADMIRA" && (
+            {/* Botón de WhatsApp para instalaciones: lo usa el propio técnico
+                para enviar a Admira la foto del QR, sin salir de la incidencia. */}
+            {inc.tipo === "INSTALACION_NUEVA" && inc.tecnico && role === "TECNICO" && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                 <p className="text-xs text-emerald-800 mb-2">
-                  💬 Avisar al técnico por WhatsApp para que envíe la foto del QR de Admira:
+                  💬 Envía a Admira la foto del QR de esta instalación por WhatsApp:
                 </p>
                 <WhatsAppButton
                   phone={obtenerNumeroWhatsAppRotativo(inc.id)}
@@ -292,7 +312,7 @@ export default function IncidenciaDetalle({
                     estancoNombre: inc.estanco?.nombre,
                     estancoDireccion: inc.direccion ?? undefined,
                   })}
-                  label="📤 Enviar por WhatsApp"
+                  label="📤 Enviar QR Admira"
                 />
               </div>
             )}
