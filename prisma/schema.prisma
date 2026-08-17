@@ -80,6 +80,9 @@ model User {
   // Historial de importaciones de datos
   estancoImportaciones EstancoImportHistory[] @relation("EstancoImportaciones")
   instalacionImportaciones InstalacionImportHistory[] @relation("InstalacionImportaciones")
+
+  notificaciones     Notificacion[]
+  pushSuscripciones  PushSubscription[]
 }
 
 // Token de un solo uso para restablecer la contraseña por email.
@@ -306,6 +309,43 @@ model InstalacionImportHistory {
 
   archivoNombre     String   // Nombre del archivo subido
   createdAt         DateTime @default(now())
+}
+
+// Notificación dirigida a un usuario concreto (campanita en la app). Cada
+// evento relevante (envío creado/recibido, incidencia asignada/en camino/
+// resuelta, tickets nuevos del desk, limpieza mensual completada...) crea una
+// fila aquí para la persona directamente afectada, y opcionalmente dispara
+// también una notificación push si tiene alguna suscripción activa.
+// tipo: ENVIO_CREADO | ENVIO_EN_CAMINO | ENVIO_RECIBIDO | INCIDENCIA_ASIGNADA |
+//       INCIDENCIA_EN_CAMINO | INCIDENCIA_RESUELTA | INCIDENCIAS_DESK_NUEVAS |
+//       LIMPIEZA_COMPLETADA
+// entidadTipo: envio | incidencia (para poder enlazar al detalle al hacer clic)
+model Notificacion {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  tipo        String
+  titulo      String
+  mensaje     String
+  leida       Boolean   @default(false)
+  entidadTipo String?
+  entidadId   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, leida])
+}
+
+// Suscripción a notificaciones push del navegador (Web Push API). Un mismo
+// usuario puede tener varias (un móvil, un ordenador...); cada una guarda las
+// claves que exige el estándar para poder cifrar el envío.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }
 
 // Historial de limpiezas automáticas mensuales (borrado de fotos resueltas).

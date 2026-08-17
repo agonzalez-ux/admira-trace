@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CambiarPassword from "./CambiarPassword";
+import NotificationBell from "./NotificationBell";
 
 export default function TopBar({
   title,
@@ -38,6 +39,7 @@ export default function TopBar({
           {subtitle && <div className="text-xs text-white/80">{subtitle}</div>}
         </div>
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <button
             onClick={() => setAbierto(true)}
             className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors"

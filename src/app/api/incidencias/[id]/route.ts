@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { notificarComercial } from "@/lib/notificarComercial";
+import { crearNotificacion } from "@/lib/notificaciones";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -47,6 +48,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     notificarComercial(params.id, "EN_CAMINO").catch((err) =>
       console.error("[notificar-comercial] Error avisando de que el técnico está en camino:", err)
     );
+  }
+
+  if (updated.creadoPorId) {
+    await crearNotificacion({
+      userId: updated.creadoPorId,
+      tipo: estado === "EN_CAMINO" ? "INCIDENCIA_EN_CAMINO" : "INCIDENCIA_RESUELTA",
+      titulo: estado === "EN_CAMINO" ? "Técnico en camino" : "Incidencia resuelta",
+      mensaje: `${updated.tecnico?.name || "El técnico"} · ${updated.titulo}`,
+      entidadTipo: "incidencia",
+      entidadId: updated.id,
+    });
   }
 
   await syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]);

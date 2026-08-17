@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
+import { crearNotificacion } from "@/lib/notificaciones";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -105,12 +106,43 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         where: { id: envio.id },
         data: { estado: "EN_TRANSITO", fechaEnviado: now },
       });
+      // ENVIO: el técnico es quien lo recibirá, se le avisa de que ya viene.
+      // RECOGIDA: quien lo preparó (Admira) es quien quiere saber que ya va hacia FDM.
+      if (envio.tipo === "ENVIO") {
+        await crearNotificacion({
+          userId: envio.tecnicoId,
+          tipo: "ENVIO_EN_CAMINO",
+          titulo: "Tu envío está en camino",
+          mensaje: `${refreshed.items.length} artículo(s) por ${envio.transportista}.`,
+          entidadTipo: "envio",
+          entidadId: envio.id,
+        });
+      } else if (envio.creadoPorId) {
+        await crearNotificacion({
+          userId: envio.creadoPorId,
+          tipo: "ENVIO_EN_CAMINO",
+          titulo: "Recogida en camino a FDM",
+          mensaje: `${refreshed.items.length} artículo(s) por ${envio.transportista}, desde ${envio.origen}.`,
+          entidadTipo: "envio",
+          entidadId: envio.id,
+        });
+      }
     }
     if (side === "destino" && allDestino && envio.estado !== "RECIBIDO") {
       await prisma.envio.update({
         where: { id: envio.id },
         data: { estado: "RECIBIDO", fechaRecibido: now },
       });
+      if (envio.creadoPorId) {
+        await crearNotificacion({
+          userId: envio.creadoPorId,
+          tipo: "ENVIO_RECIBIDO",
+          titulo: envio.tipo === "ENVIO" ? "Envío confirmado por el técnico" : "Recogida confirmada en FDM",
+          mensaje: `${refreshed.items.length} artículo(s) recibidos en ${envio.destino}.`,
+          entidadTipo: "envio",
+          entidadId: envio.id,
+        });
+      }
     }
   }
 

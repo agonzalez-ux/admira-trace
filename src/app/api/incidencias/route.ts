@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { syncDeskTickets } from "@/lib/desk";
+import { crearNotificacion } from "@/lib/notificaciones";
 import { syncHardwareDesconectado } from "@/lib/hardwareSync";
 import { matchEstanco } from "@/lib/estancoMatch";
 import { iniciarScheduler } from "@/lib/scheduler";
@@ -94,6 +95,15 @@ export async function POST(req: NextRequest) {
   });
 
   await syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]);
+
+  await crearNotificacion({
+    userId: tecnicoId,
+    tipo: "INCIDENCIA_ASIGNADA",
+    titulo: "Nueva incidencia asignada",
+    mensaje: incidencia.titulo,
+    entidadTipo: "incidencia",
+    entidadId: incidencia.id,
+  });
 
   return NextResponse.json({ incidencia });
 }

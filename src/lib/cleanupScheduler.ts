@@ -11,6 +11,7 @@ import * as path from "path";
 import { promisify } from "util";
 import cron from "node-cron";
 import type { ScheduledTask } from "node-cron";
+import { notificarEquipoAdmira } from "./notificaciones";
 
 const copyFile = promisify(fs.copyFile);
 const unlink = promisify(fs.unlink);
@@ -251,6 +252,12 @@ export async function initMonthlyCleanupScheduler(): Promise<void> {
         console.log(
           `[cleanup-scheduler] ✅ Limpieza completada: ${resultado.fotosMovidas} fotos movidas, ${resultado.fotosEliminadas} eliminadas, ${resultado.backupsLimpiados} backups limpiados (${duracion}s)`
         );
+
+        await notificarEquipoAdmira({
+          tipo: "LIMPIEZA_COMPLETADA",
+          titulo: "Limpieza mensual completada",
+          mensaje: `${resultado.fotosMovidas} fotos archivadas, ${resultado.fotosEliminadas} eliminadas, ${resultado.backupsLimpiados} backups antiguos limpiados.`,
+        });
       } catch (err) {
         console.error("[cleanup-scheduler] ❌ Error ejecutando limpieza:", err);
       }

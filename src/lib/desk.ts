@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { DESK_ALTADIS_PROJECTS } from "./deskConfig";
 import { syncToSheets } from "./googleSheets";
 import { matchEstanco } from "./estancoMatch";
+import { notificarEquipoAdmira } from "./notificaciones";
 
 const DESK_API_BASE = process.env.DESK_API_BASE_URL || "http://api.desk.admira.com/api";
 const DESK_API_TOKEN = process.env.DESK_API_TOKEN;
@@ -193,6 +194,14 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
 
   if (nuevas > 0 || actualizadas > 0) {
     await syncToSheets(["incidencias", "intervenciones"]);
+  }
+
+  if (nuevas > 0) {
+    await notificarEquipoAdmira({
+      tipo: "INCIDENCIAS_DESK_NUEVAS",
+      titulo: nuevas === 1 ? "1 ticket nuevo del desk" : `${nuevas} tickets nuevos del desk`,
+      mensaje: "Requieren visita in situ y están sin técnico asignado.",
+    });
   }
 
   return { nuevas, actualizadas };

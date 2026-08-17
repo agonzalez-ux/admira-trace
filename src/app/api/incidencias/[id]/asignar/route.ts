@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
+import { crearNotificacion } from "@/lib/notificaciones";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -36,6 +37,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 
   await syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]);
+
+  await crearNotificacion({
+    userId: tecnicoId,
+    tipo: "INCIDENCIA_ASIGNADA",
+    titulo: "Nueva incidencia asignada",
+    mensaje: updated.titulo,
+    entidadTipo: "incidencia",
+    entidadId: updated.id,
+  });
 
   return NextResponse.json({ incidencia: updated });
 }

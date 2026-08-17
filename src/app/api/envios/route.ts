@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { calcularProximaEjecucion } from "@/lib/ordenesRecurrentes";
+import { crearNotificacion } from "@/lib/notificaciones";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -96,6 +97,16 @@ export async function POST(req: NextRequest) {
   });
 
   await syncToSheets(["envios", "materiales"]);
+
+  const esRecogida = envio.tipo === "RECOGIDA";
+  await crearNotificacion({
+    userId: tecnicoId,
+    tipo: "ENVIO_CREADO",
+    titulo: esRecogida ? "Nueva recogida programada" : "Nuevo envío en camino",
+    mensaje: `${envio.items.length} artículo(s) por ${transportista}, desde ${origen}.`,
+    entidadTipo: "envio",
+    entidadId: envio.id,
+  });
 
   return NextResponse.json({ envio, ordenRecurrente: Boolean(ordenRecurrenteId) });
 }
