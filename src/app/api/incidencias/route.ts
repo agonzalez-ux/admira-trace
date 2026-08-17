@@ -19,17 +19,19 @@ export async function GET() {
   // de tickets (tickets activos que requieren visita in situ de los proyectos Altadis)
   // y, como mucho cada 20 minutos, con el directorio de estancos — sin que nadie
   // tenga que darle a ningún botón.
+  //
+  // Antes se esperaba (await) a que terminaran estas sincronizaciones antes de
+  // responder, lo que podía tardar 20-30s (7 proyectos del desk, cada uno con
+  // varias páginas de peticiones) y hacía que la pestaña de Incidencias se
+  // sintiera colgada en cada carga. Ahora se lanzan en segundo plano: la
+  // página responde al instante con lo que ya hay en la base de datos, y la
+  // sincronización sigue corriendo aparte (protegida por su propio límite de
+  // 1 vez por minuto), así que en la siguiente carga ya estará al día.
   if (session.role === "ADMIRA") {
-    try {
-      await syncDeskTickets();
-    } catch (err) {
-      console.error("[desk-sync] Error sincronizando tickets del desk:", err);
-    }
-    try {
-      await syncHardwareDesconectado();
-    } catch (err) {
-      console.error("[hardware-sync] Error sincronizando pantallas desconectadas:", err);
-    }
+    syncDeskTickets().catch((err) => console.error("[desk-sync] Error sincronizando tickets del desk:", err));
+    syncHardwareDesconectado().catch((err) =>
+      console.error("[hardware-sync] Error sincronizando pantallas desconectadas:", err)
+    );
     syncToSheets("estancos").catch((err) => console.error("[google-sheets] Error sincronizando estancos:", err));
   }
 

@@ -141,54 +141,61 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
   const ventanaDias = ventanaDiasActual;
 
   for (const proyecto of DESK_ALTADIS_PROJECTS) {
-    // OJO: el parámetro "project" de /api/ticket/search espera el campo "id" del
-    // listado de proyectos (/api/projects/all), no el "project_id" interno.
-    const tickets = await fetchAllActiveTickets(proyecto.id);
+    try {
+      // OJO: el parámetro "project" de /api/ticket/search espera el campo "id" del
+      // listado de proyectos (/api/projects/all), no el "project_id" interno.
+      const tickets = await fetchAllActiveTickets(proyecto.id);
 
-    for (const t of tickets) {
-      const deskTicketId = String(t.id);
-      const existente = await prisma.incidencia.findUnique({ where: { deskTicketId } });
+      for (const t of tickets) {
+        const deskTicketId = String(t.id);
+        const existente = await prisma.incidencia.findUnique({ where: { deskTicketId } });
 
-      const descripcionPartes = [
-        t.type_detail_name ? `Tipo: ${t.type_detail_name}` : null,
-        t.priority_name ? `Prioridad: ${t.priority_name}` : null,
-        `Estado en el desk: ${t.state_name}`,
-      ].filter(Boolean);
+        const descripcionPartes = [
+          t.type_detail_name ? `Tipo: ${t.type_detail_name}` : null,
+          t.priority_name ? `Prioridad: ${t.priority_name}` : null,
+          `Estado en el desk: ${t.state_name}`,
+        ].filter(Boolean);
 
-      if (!existente) {
-        if (!requiereTecnicoInSitu(t)) continue;
-        if (!dentroDeVentana(t.inserted, ventanaDias)) continue;
-        const match = await matchEstanco(t.ticketName || t.subject || "");
-        await prisma.incidencia.create({
-          data: {
-            origen: "DESK",
-            deskTicketId,
-            deskProyecto: t.project,
-            deskEstado: t.state_name,
-            ticketExternoId: deskTicketId,
-            titulo: t.subject || t.ticketName,
-            descripcion: descripcionPartes.join(" · "),
-            tipo: "REPARACION",
-            cliente: t.project,
-            direccion: t.ticketName,
-            estado: "SIN_ASIGNAR",
-            estancoId: match?.estancoId || null,
-            estancoMatchConfianza: match?.confianza || null,
-          },
-        });
-        nuevas += 1;
-      } else if (existente.estado === "SIN_ASIGNAR" && existente.deskEstado !== t.state_name) {
-        // Actualizamos datos de referencia mientras siga sin asignar; una vez asignada
-        // no se vuelve a tocar automáticamente para no interferir con el trabajo del técnico.
-        await prisma.incidencia.update({
-          where: { id: existente.id },
-          data: {
-            deskEstado: t.state_name,
-            descripcion: descripcionPartes.join(" · "),
-          },
-        });
-        actualizadas += 1;
+        if (!existente) {
+          if (!requiereTecnicoInSitu(t)) continue;
+          if (!dentroDeVentana(t.inserted, ventanaDias)) continue;
+          const match = await matchEstanco(t.ticketName || t.subject || "");
+          await prisma.incidencia.create({
+            data: {
+              origen: "DESK",
+              deskTicketId,
+              deskProyecto: t.project,
+              deskEstado: t.state_name,
+              ticketExternoId: deskTicketId,
+              titulo: t.subject || t.ticketName,
+              descripcion: descripcionPartes.join(" · "),
+              tipo: "REPARACION",
+              cliente: t.project,
+              direccion: t.ticketName,
+              estado: "SIN_ASIGNAR",
+              estancoId: match?.estancoId || null,
+              estancoMatchConfianza: match?.confianza || null,
+            },
+          });
+          nuevas += 1;
+        } else if (existente.estado === "SIN_ASIGNAR" && existente.deskEstado !== t.state_name) {
+          // Actualizamos datos de referencia mientras siga sin asignar; una vez asignada
+          // no se vuelve a tocar automáticamente para no interferir con el trabajo del técnico.
+          await prisma.incidencia.update({
+            where: { id: existente.id },
+            data: {
+              deskEstado: t.state_name,
+              descripcion: descripcionPartes.join(" · "),
+            },
+          });
+          actualizadas += 1;
+        }
       }
+    } catch (err) {
+      // Si un proyecto falla (timeout, error del desk, etc.) no debe impedir que
+      // se sincronicen los demás: antes un solo fallo cortaba el bucle entero y
+      // dejaba sin sincronizar todos los proyectos siguientes en esa pasada.
+      console.error(`[desk-sync] Error sincronizando el proyecto "${proyecto.name}" (id ${proyecto.id}):`, err);
     }
   }
 
