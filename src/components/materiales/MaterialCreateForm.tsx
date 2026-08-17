@@ -215,9 +215,14 @@ export default function MaterialCreateForm({
           onScan={(numeroExtraido) => {
             setNumeroSerie(numeroExtraido);
             setScanning(false);
-            // Si no hay código de barras, generar uno basado en el número de serie
+            // Si no hay código de barras, generar uno basado en el número de serie.
+            // Al ponerlo, se consulta igual que si se hubiera escrito a mano, para
+            // avisar de duplicados y autorrellenar tipo/nombre — si no, ese aviso
+            // solo saltaba escribiendo el código manualmente.
             if (!codigoBarras && numeroExtraido) {
-              setCodigoBarras(numeroExtraido.replace(/\s/g, "").substring(0, 20));
+              const nuevoCodigo = numeroExtraido.replace(/\s/g, "").substring(0, 20);
+              setCodigoBarras(nuevoCodigo);
+              rellenarDesdeCodigo(nuevoCodigo);
             }
           }}
           onClose={() => setScanning(false)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 type TabActiva = 'estancos' | 'instalaciones';
 
@@ -8,20 +8,14 @@ export default function ImportarDatos() {
   const [tabActiva, setTabActiva] = useState<TabActiva>('estancos');
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState<{tipo: 'exito' | 'error'; mensaje: string} | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleArrastrar = (e: React.DragEvent, tipo: TabActiva) => {
     e.preventDefault();
     e.stopPropagation();
   };
 
-  const handleSoltar = async (e: React.DragEvent, tipo: TabActiva) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const archivos = e.dataTransfer.files;
-    if (!archivos || archivos.length === 0) return;
-
-    const archivo = archivos[0];
+  const procesarArchivo = async (archivo: File, tipo: TabActiva) => {
     if (!archivo.name.endsWith('.xlsx') && !archivo.name.endsWith('.xls')) {
       setResultado({ tipo: 'error', mensaje: 'Solo se aceptan archivos Excel (.xlsx, .xls)' });
       return;
@@ -54,8 +48,35 @@ export default function ImportarDatos() {
     }
   };
 
+  const handleSoltar = async (e: React.DragEvent, tipo: TabActiva) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const archivos = e.dataTransfer.files;
+    if (!archivos || archivos.length === 0) return;
+    await procesarArchivo(archivos[0], tipo);
+  };
+
+  // El recuadro dice "o haz clic para seleccionar", pero no había ningún
+  // <input type="file"> real detrás — el clic no hacía nada. Se abre aquí un
+  // selector de archivo oculto, compartido entre las dos pestañas.
+  const handleClickSeleccionar = () => fileInputRef.current?.click();
+
+  const handleArchivoSeleccionado = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = ''; // permite volver a elegir el mismo archivo si hace falta
+    if (archivo) await procesarArchivo(archivo, tabActiva);
+  };
+
   return (
     <div className="space-y-6">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={handleArchivoSeleccionado}
+        className="hidden"
+      />
       {/* Tabs */}
       <div className="flex gap-2 border-b">
         <button
@@ -130,6 +151,7 @@ export default function ImportarDatos() {
           <div
             onDragOver={(e) => handleArrastrar(e, 'estancos')}
             onDrop={(e) => handleSoltar(e, 'estancos')}
+            onClick={handleClickSeleccionar}
             className={`border-2 border-dashed rounded-lg p-12 text-center transition cursor-pointer ${
               cargando
                 ? 'border-gray-300 bg-gray-50'
@@ -216,6 +238,7 @@ export default function ImportarDatos() {
           <div
             onDragOver={(e) => handleArrastrar(e, 'instalaciones')}
             onDrop={(e) => handleSoltar(e, 'instalaciones')}
+            onClick={handleClickSeleccionar}
             className={`border-2 border-dashed rounded-lg p-12 text-center transition cursor-pointer ${
               cargando
                 ? 'border-gray-300 bg-gray-50'

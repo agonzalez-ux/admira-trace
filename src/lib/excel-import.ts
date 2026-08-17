@@ -6,6 +6,24 @@
 import ExcelJS from "exceljs";
 
 /**
+ * Lee una celda por nombre de columna (no por índice fijo, porque el orden de
+ * columnas puede variar entre Excels). Si la columna no existe en este
+ * archivo concreto, devuelve null en vez de intentar `row.getCell(0)`, que
+ * lanza una excepción ("0 is out of bounds") y tiraría abajo la fila entera
+ * (o, si el patrón se repite en todas las filas, la importación completa).
+ */
+function celda(row: ExcelJS.Row, headers: Map<string, number>, columna: string): ExcelJS.CellValue | null {
+  const col = headers.get(columna);
+  if (col === undefined) return null;
+  return row.getCell(col).value;
+}
+
+/** Como `celda`, pero como texto ya recortado (o null si está vacía / no existe la columna). */
+function celdaTexto(row: ExcelJS.Row, headers: Map<string, number>, columna: string): string | null {
+  return celda(row, headers, columna)?.toString().trim() || null;
+}
+
+/**
  * Estructura de una fila del Excel ASIGNACIONES_AGO26.
  */
 export interface FilaAsignaciones {
@@ -97,27 +115,15 @@ export async function parseExcelAsignaciones(archivo: File): Promise<{
         const fila: FilaAsignaciones = {
           idEstanco,
           nombre,
-          zona: row.getCell(headers.get("CLT.GEO.RTC") || 0).value?.toString().trim() || null,
-          provincia:
-            row.getCell(headers.get("CLT.GEO.PROVINCIA") || 0).value?.toString().trim() || null,
-          codigoPostal:
-            row.getCell(headers.get("CLT.GEO.CODIGO.POSTAL") || 0).value?.toString().trim() || null,
-          municipio:
-            row.getCell(headers.get("CLT.GEO.MUNICIPIO") || 0).value?.toString().trim() || null,
-          comercial:
-            row
-              .getCell(headers.get("FFVV.RESPONSABLE FULLNAME") || 0)
-              .value?.toString()
-              .trim() || null,
-          correoComercial:
-            row.getCell(headers.get("COMERCIAL_MAIL") || 0).value?.toString().trim() || null,
-          telefonoComercial:
-            row.getCell(headers.get("COMERCIAL_TFNO") || 0).value?.toString().trim() || null,
-          frecuencia:
-            row.getCell(headers.get("CLT.FRECUENCIA.VISITA") || 0).value?.toString().trim() ||
-            null,
-          segmento:
-            row.getCell(headers.get("CLT.SEGMENTO.ITG") || 0).value?.toString().trim() || null,
+          zona: celdaTexto(row, headers, "CLT.GEO.RTC"),
+          provincia: celdaTexto(row, headers, "CLT.GEO.PROVINCIA"),
+          codigoPostal: celdaTexto(row, headers, "CLT.GEO.CODIGO.POSTAL"),
+          municipio: celdaTexto(row, headers, "CLT.GEO.MUNICIPIO"),
+          comercial: celdaTexto(row, headers, "FFVV.RESPONSABLE FULLNAME"),
+          correoComercial: celdaTexto(row, headers, "COMERCIAL_MAIL"),
+          telefonoComercial: celdaTexto(row, headers, "COMERCIAL_TFNO"),
+          frecuencia: celdaTexto(row, headers, "CLT.FRECUENCIA.VISITA"),
+          segmento: celdaTexto(row, headers, "CLT.SEGMENTO.ITG"),
         };
 
         filas.push(fila);
@@ -213,24 +219,14 @@ export async function parseExcelInstalaciones(archivo: File): Promise<{
           sr,
           codHost,
           expendeduria,
-          mobiliario:
-            row.getCell(headers.get("MOBILIARIO") || 0).value?.toString().trim() || "",
-          statusAdicional:
-            row.getCell(headers.get("STATUS ADICIONAL") || 0).value?.toString().trim() || null,
-          fechaCreacion: parseFecha(row.getCell(headers.get("FECHA CREACIÓN") || 0).value),
-          fechaPrevista: parseFecha(row.getCell(headers.get("FECHA PREVISTA") || 0).value),
-          fechaFinalizacion: parseFecha(
-            row.getCell(headers.get("FECHA FINALIZACION") || 0).value
-          ),
-          provincia:
-            row.getCell(headers.get("PROVINCIA") || 0).value?.toString().trim() || null,
-          asignacionActual:
-            row
-              .getCell(headers.get("ASIGNACION ACTUAL") || 0)
-              .value?.toString()
-              .trim() || null,
-          comentarios:
-            row.getCell(headers.get("COMENTARIOS") || 0).value?.toString().trim() || null,
+          mobiliario: celdaTexto(row, headers, "MOBILIARIO") || "",
+          statusAdicional: celdaTexto(row, headers, "STATUS ADICIONAL"),
+          fechaCreacion: parseFecha(celda(row, headers, "FECHA CREACIÓN")),
+          fechaPrevista: parseFecha(celda(row, headers, "FECHA PREVISTA")),
+          fechaFinalizacion: parseFecha(celda(row, headers, "FECHA FINALIZACION")),
+          provincia: celdaTexto(row, headers, "PROVINCIA"),
+          asignacionActual: celdaTexto(row, headers, "ASIGNACION ACTUAL"),
+          comentarios: celdaTexto(row, headers, "COMENTARIOS"),
         };
 
         filas.push(fila);

@@ -163,19 +163,31 @@ export async function ejecutarLimpiezaMensual(): Promise<CleanupResult> {
   }
 }
 
-/**
- * Obtiene el próximo primer lunes del mes desde hoy.
- */
-export function obtenerProximoPrimerLunes(): Date {
-  const hoy = new Date();
-  let fecha = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1); // Primer día del mes siguiente
+/** El primer lunes de un mes cae siempre entre los días 1 y 7. */
+export function esPrimerLunesDelMes(fecha: Date): boolean {
+  return fecha.getDay() === 1 && fecha.getDate() <= 7;
+}
 
-  // Encontrar el primer lunes
+function primerLunesDelMes(year: number, month: number): Date {
+  const fecha = new Date(year, month, 1);
   while (fecha.getDay() !== 1) {
     fecha.setDate(fecha.getDate() + 1);
   }
-
   return fecha;
+}
+
+/**
+ * Obtiene el próximo primer lunes del mes desde hoy: el de este mes si aún no
+ * ha pasado, o si no el del mes siguiente.
+ */
+export function obtenerProximoPrimerLunes(): Date {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const deEsteMes = primerLunesDelMes(hoy.getFullYear(), hoy.getMonth());
+  if (deEsteMes.getTime() >= hoy.getTime()) return deEsteMes;
+
+  return primerLunesDelMes(hoy.getFullYear(), hoy.getMonth() + 1);
 }
 
 /**
@@ -214,17 +226,7 @@ export async function initMonthlyCleanupScheduler(): Promise<void> {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    // Obtener el primer lunes del mes actual
-    const primerLunes = obtenerProximoPrimerLunes();
-    primerLunes.setHours(0, 0, 0, 0);
-
-    // Si hoy es el primer lunes de siguiente mes, no hace nada
-    // (el scheduler corre todos los días, así que ejecutaremos en el primer lunes)
-    const proximoLunes = obtenerProximoPrimerLunes();
-    proximoLunes.setHours(0, 0, 0, 0);
-
-    // Si hoy es el primer lunes del próximo mes
-    if (hoy.getTime() === proximoLunes.getTime()) {
+    if (esPrimerLunesDelMes(hoy)) {
       console.log(
         `[cleanup-scheduler] 🧹 Hoy es el primer lunes del mes (${hoy.toISOString().split("T")[0]}). Ejecutando limpieza...`
       );

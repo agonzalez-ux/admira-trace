@@ -14,12 +14,23 @@ const USER_AGENT = "AdmiraTrace/1.0 (gestion interna de instalaciones)";
 const MIN_INTERVALO_MS = 1100;
 
 let ultimaPeticion = 0;
+// Cola de turnos: si dos llamadas a geocodificar() se solapan (p. ej. el
+// relleno en segundo plano de varios técnicos a la vez), cada una encadena su
+// espera detrás de la anterior en vez de leer/escribir `ultimaPeticion` por su
+// cuenta, que dejaba una ventana donde dos peticiones podían colarse casi a
+// la vez y saltarse el límite de 1/segundo de Nominatim.
+let colaTurnos: Promise<void> = Promise.resolve();
 
-async function esperarTurno() {
-  const ahora = Date.now();
-  const espera = ultimaPeticion + MIN_INTERVALO_MS - ahora;
-  if (espera > 0) await new Promise((r) => setTimeout(r, espera));
-  ultimaPeticion = Date.now();
+function esperarTurno(): Promise<void> {
+  const miTurno = colaTurnos.then(async () => {
+    const ahora = Date.now();
+    const espera = ultimaPeticion + MIN_INTERVALO_MS - ahora;
+    if (espera > 0) await new Promise((r) => setTimeout(r, espera));
+    ultimaPeticion = Date.now();
+  });
+  // Si esta espera falla por lo que sea, no debe atascar la cola para las siguientes.
+  colaTurnos = miTurno.catch(() => {});
+  return miTurno;
 }
 
 export async function geocodificar(direccion: string): Promise<{ lat: number; lon: number } | null> {

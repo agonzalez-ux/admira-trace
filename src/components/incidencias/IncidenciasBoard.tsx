@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import SerialNumberScanner from "@/components/SerialNumberScanner";
+import BarcodeScanner from "@/components/BarcodeScanner";
 import WhatsAppButton from "./WhatsAppButton";
 import IncidenciaDetalle, { IncidenciaDetalleData } from "./IncidenciaDetalle";
 import {
@@ -595,7 +595,7 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
         </>
       )}
 
-      {scanTarget && <SerialNumberScanner onScan={handleScanMaterial} onClose={() => setScanTarget(null)} />}
+      {scanTarget && <BarcodeScanner onScan={handleScanMaterial} onClose={() => setScanTarget(null)} />}
       {detalle && (
         <IncidenciaDetalle
           incidencia={detalle}
