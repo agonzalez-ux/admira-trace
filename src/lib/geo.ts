@@ -74,6 +74,44 @@ export function distanciaKm(a: { lat: number; lon: number }, b: { lat: number; l
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// Relleno en segundo plano de coordenadas de técnicos que aún no las tienen.
+// Se lanza cada vez que alguien pide "técnicos más cercanos" para una
+// incidencia. Sin este candado, pedirlo para varias incidencias seguidas (algo
+// muy normal con cientos de tickets sin asignar) lanzaba un barrido completo
+// nuevo cada vez, todos compitiendo por la misma cola de 1 petición/segundo de
+// Nominatim — y una petición en primer plano (la del propio estanco de la
+// incidencia, que si bloquea la respuesta) podía quedar atascada varios
+// minutos detrás de esa cola, superando el tiempo de espera del túnel y
+// devolviendo la lista sin ninguna distancia. Ahora solo hay un barrido activo
+// a la vez, y cada pasada procesa como mucho unos pocos técnicos para no
+// acaparar la cola durante mucho rato.
+let rellenoEnCurso = false;
+const LOTE_MAXIMO_POR_PASADA = 8;
+
+/**
+ * Lanza (si no hay ya uno en marcha) un relleno en segundo plano de
+ * coordenadas para los técnicos indicados que aún no las tengan. No bloquea:
+ * se puede llamar sin await.
+ */
+export function rellenarCoordsTecnicosEnSegundoPlano(tecnicoIds: string[]): void {
+  if (rellenoEnCurso || tecnicoIds.length === 0) return;
+  rellenoEnCurso = true;
+
+  (async () => {
+    try {
+      for (const id of tecnicoIds.slice(0, LOTE_MAXIMO_POR_PASADA)) {
+        try {
+          await asegurarCoordsTecnico(id);
+        } catch (err) {
+          console.error("[geo] Error geocodificando técnico en segundo plano:", id, err);
+        }
+      }
+    } finally {
+      rellenoEnCurso = false;
+    }
+  })();
+}
+
 /** Geocodifica y guarda las coordenadas de un técnico, si aún no las tiene. */
 export async function asegurarCoordsTecnico(tecnicoId: string): Promise<{ lat: number; lon: number } | null> {
   const t = await prisma.user.findUnique({ where: { id: tecnicoId } });

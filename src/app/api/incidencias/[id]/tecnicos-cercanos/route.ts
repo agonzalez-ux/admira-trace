@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { asegurarCoordsEstanco, asegurarCoordsTecnico, distanciaKm } from "@/lib/geo";
+import { asegurarCoordsEstanco, distanciaKm, rellenarCoordsTecnicosEnSegundoPlano } from "@/lib/geo";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -47,18 +47,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     distanciaKm: t.lat !== null && t.lon !== null ? Math.round(distanciaKm(coordsIncidencia, { lat: t.lat, lon: t.lon })) : null,
   }));
 
-  const sinCoords = tecnicos.filter((t) => t.lat === null || t.lon === null);
-  if (sinCoords.length > 0) {
-    (async () => {
-      for (const t of sinCoords) {
-        try {
-          await asegurarCoordsTecnico(t.id);
-        } catch (err) {
-          console.error("[tecnicos-cercanos] Error geocodificando técnico en segundo plano:", t.id, err);
-        }
-      }
-    })();
-  }
+  rellenarCoordsTecnicosEnSegundoPlano(tecnicos.filter((t) => t.lat === null || t.lon === null).map((t) => t.id));
 
   // Los que tienen distancia conocida primero, de más cerca a más lejos.
   conDistancia.sort((a, b) => {
