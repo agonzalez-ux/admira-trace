@@ -178,14 +178,25 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
             },
           });
           nuevas += 1;
-        } else if (existente.estado === "SIN_ASIGNAR" && existente.deskEstado !== t.state_name) {
-          // Actualizamos datos de referencia mientras siga sin asignar; una vez asignada
-          // no se vuelve a tocar automáticamente para no interferir con el trabajo del técnico.
+        } else if (existente.estado === "SIN_ASIGNAR") {
+          // Mientras siga sin asignar, además de refrescar el estado del desk,
+          // reintentamos el emparejamiento con el directorio de estancos si
+          // todavía no tiene uno: el emparejador ha ido mejorando con el tiempo
+          // (títulos con formatos raros que antes no reconocía), así que un
+          // ticket que se quedó sin vincular puede engancharse en una pasada
+          // posterior sin tener que tocar nada a mano. Una vez asignada, no se
+          // vuelve a tocar automáticamente para no interferir con el técnico.
+          const cambioEstado = existente.deskEstado !== t.state_name;
+          const necesitaReintentoEstanco = !existente.estancoId;
+          if (!cambioEstado && !necesitaReintentoEstanco) continue;
+
+          const match = necesitaReintentoEstanco ? await matchEstanco(t.ticketName || t.subject || "") : null;
           await prisma.incidencia.update({
             where: { id: existente.id },
             data: {
               deskEstado: t.state_name,
               descripcion: descripcionPartes.join(" · "),
+              ...(match ? { estancoId: match.estancoId, estancoMatchConfianza: match.confianza } : {}),
             },
           });
           actualizadas += 1;
