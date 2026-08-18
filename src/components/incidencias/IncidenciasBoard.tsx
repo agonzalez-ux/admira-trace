@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import WhatsAppButton from "./WhatsAppButton";
 import IncidenciaDetalle, { IncidenciaDetalleData } from "./IncidenciaDetalle";
+import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 import {
   ESTADO_INCIDENCIA_LABELS,
   TIPO_INCIDENCIA_LABELS,
@@ -72,23 +73,19 @@ function SelectorTecnicoCercano({
   const lista: TecnicoCercano[] =
     tecnicos ?? tecnicosBase.map((t) => ({ id: t.id, name: t.name, zona: t.zona, distanciaKm: null }));
 
+  const opciones = lista.map((t, idx) => ({
+    ...t,
+    destacar: tecnicos !== null && idx === 0 && t.distanciaKm !== null,
+  }));
+
   return (
     <div>
-      <select
+      <TecnicoCombobox
+        tecnicos={opciones}
         value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        className="text-xs rounded-lg border border-slate-300 px-2 py-2 w-full"
-      >
-        <option value="">Técnico…</option>
-        {lista.map((t, idx) => (
-          <option key={t.id} value={t.id}>
-            {tecnicos !== null && idx === 0 && t.distanciaKm !== null ? "⭐ " : ""}
-            {t.name}
-            {t.zona ? ` · ${t.zona}` : ""}
-            {t.distanciaKm !== null ? ` — ${t.distanciaKm} km` : ""}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        placeholder="Técnico…"
+      />
       {tecnicos === null ? (
         <button
           type="button"

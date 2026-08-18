@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TIPO_INCIDENCIA_LABELS, TIPOS_INCIDENCIA } from "@/lib/constants";
+import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 
 type Tecnico = { id: string; name: string; zona: string | null };
 
@@ -84,12 +85,13 @@ export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => v
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Técnico asignado</label>
-        <select value={tecnicoId} onChange={(e) => setTecnicoId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
-          <option value="">— Selecciona técnico —</option>
-          {tecnicos.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}{t.zona ? ` · ${t.zona}` : ""}</option>
-          ))}
-        </select>
+        <TecnicoCombobox
+          tecnicos={tecnicos}
+          value={tecnicoId}
+          onChange={setTecnicoId}
+          placeholder="Buscar técnico por nombre o ciudad…"
+          className="text-sm"
+        />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {ok && <p className="text-sm text-emerald-600">Incidencia asignada. El técnico verá la notificación en su app.</p>}
