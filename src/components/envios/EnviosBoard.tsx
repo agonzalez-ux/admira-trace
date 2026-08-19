@@ -28,6 +28,7 @@ type Envio = {
   transportista: string;
   origen: string;
   destino: string;
+  almacen: "FDM" | "ADMIRA";
   estado: EstadoEnvio;
   esRecurrente: boolean;
   notas: string | null;
@@ -66,8 +67,11 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
   }, [load]);
 
   function sideForRole(envio: Envio): "origen" | "destino" | null {
-    const origenRol = envio.tipo === "ENVIO" ? "FDM" : "TECNICO";
-    const destinoRol = envio.tipo === "ENVIO" ? "TECNICO" : "FDM";
+    // El lado "almacén" es FDM o Admira según con qué almacén se creó el
+    // envío — no siempre FDM, desde que Admira también puede enviar/recibir
+    // material directamente con los técnicos.
+    const origenRol = envio.tipo === "ENVIO" ? envio.almacen : "TECNICO";
+    const destinoRol = envio.tipo === "ENVIO" ? "TECNICO" : envio.almacen;
     if (role === origenRol && !envio.items.every((i) => i.escaneadoOrigen)) return "origen";
     if (role === destinoRol && envio.items.every((i) => i.escaneadoOrigen) && !envio.items.every((i) => i.escaneadoDestino))
       return "destino";
@@ -160,7 +164,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
         </p>
       )}
       {visibleEnvios.map((envio) => {
-        const side = role !== "ADMIRA" ? sideForRole(envio) : null;
+        const side = sideForRole(envio);
         const progresoOrigen = envio.items.filter((i) => i.escaneadoOrigen).length;
         const progresoDestino = envio.items.filter((i) => i.escaneadoDestino).length;
         return (

@@ -51,9 +51,11 @@ export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generado
     const materialIds: string[] = [];
     const avisos: string[] = [];
 
+    const estadoAlmacen = orden.almacen === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM";
+
     for (const item of config) {
       const disponibles = await prisma.material.findMany({
-        where: { tipo: item.tipo, estado: { in: ["EN_FDM", "EN_ADMIRA"] } },
+        where: { tipo: item.tipo, estado: estadoAlmacen },
         take: item.cantidad,
         orderBy: { createdAt: "asc" },
       });
@@ -80,8 +82,9 @@ export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generado
       data: {
         tipo: "ENVIO",
         transportista: orden.transportista,
-        origen: "Almacén FDM / Admira",
+        origen: `Almacén ${orden.almacen === "ADMIRA" ? "Admira" : "FDM"}`,
         destino: orden.tecnico.name,
+        almacen: orden.almacen,
         tecnicoId: orden.tecnicoId,
         esRecurrente: true,
         ordenRecurrenteId: orden.id,

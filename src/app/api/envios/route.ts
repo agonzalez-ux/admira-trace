@@ -35,10 +35,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { tipo, transportista, origen, destino, tecnicoId, materialIds, esRecurrente, frecuenciaDias, notas } = body || {};
+  const { tipo, transportista, origen, destino, almacen, tecnicoId, materialIds, esRecurrente, frecuenciaDias, notas } =
+    body || {};
 
   if (!tipo || !transportista || !origen || !destino || !tecnicoId || !Array.isArray(materialIds) || materialIds.length === 0) {
     return NextResponse.json({ error: "Faltan campos obligatorios o no hay material seleccionado." }, { status: 400 });
+  }
+  if (almacen !== "FDM" && almacen !== "ADMIRA") {
+    return NextResponse.json({ error: "Indica de qué almacén sale (o a qué almacén vuelve) el material." }, { status: 400 });
   }
 
   const tecnico = await prisma.user.findUnique({ where: { id: tecnicoId } });
@@ -68,6 +72,7 @@ export async function POST(req: NextRequest) {
         tecnicoId,
         frecuenciaDias: dias,
         transportista,
+        almacen,
         materialConfig: JSON.stringify(config),
         notas: notas || null,
         creadoPorId: session.userId,
@@ -84,6 +89,7 @@ export async function POST(req: NextRequest) {
       transportista,
       origen,
       destino,
+      almacen,
       tecnicoId,
       esRecurrente: !!esRecurrente,
       ordenRecurrenteId,

@@ -106,6 +106,8 @@ model OrdenRecurrente {
   tecnico       User      @relation("OrdenRecurrenteTecnico", fields: [tecnicoId], references: [id])
   frecuenciaDias Int
   transportista String    @default("MARESA")
+  // De qué almacén (FDM o Admira) sale el material en cada envío que genere.
+  almacen       String    @default("FDM")
   // Tipos de material a reponer y cuántas unidades de cada uno, en JSON:
   // [{ "tipo": "PANTALLA", "cantidad": 2 }, ...]
   materialConfig String
@@ -165,12 +167,16 @@ model MaterialEvento {
 // tipo: ENVIO | RECOGIDA
 // transportista: MARESA | RENUS | OTRO
 // estado: PENDIENTE_PREPARACION | ENVIADO | EN_TRANSITO | RECIBIDO | INCIDENCIA
+// almacen: FDM | ADMIRA — qué almacén es el lado "almacén" de este movimiento
+// (el otro lado siempre es el técnico). Determina quién tiene que escanear
+// para confirmar el envío/recepción en ese extremo.
 model Envio {
   id            String    @id @default(cuid())
   tipo          String    @default("ENVIO")
   transportista String    @default("MARESA")
   origen        String
   destino       String
+  almacen       String    @default("FDM")
   tecnicoId     String
   tecnico       User      @relation("EnvioTecnico", fields: [tecnicoId], references: [id])
   estado        String    @default("PENDIENTE_PREPARACION")

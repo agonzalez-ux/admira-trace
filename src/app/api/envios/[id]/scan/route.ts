@@ -6,7 +6,7 @@ import { crearNotificacion } from "@/lib/notificaciones";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
-  if (!session || (session.role !== "FDM" && session.role !== "TECNICO")) {
+  if (!session || (session.role !== "FDM" && session.role !== "ADMIRA" && session.role !== "TECNICO")) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
@@ -25,12 +25,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (session.role === "TECNICO" && envio.tecnicoId !== session.userId) {
     return NextResponse.json({ error: "Este envío no pertenece a tu cuenta." }, { status: 403 });
   }
+  // El lado "almacén" de este envío en concreto es FDM o Admira según con qué
+  // almacén se creó — un miembro de FDM no puede escanear un envío que sale
+  // del almacén de Admira, y viceversa.
+  if (session.role !== "TECNICO" && session.role !== envio.almacen) {
+    return NextResponse.json({ error: "Este envío no corresponde a tu almacén." }, { status: 403 });
+  }
 
   // Determinar qué lado corresponde escanear según el tipo de movimiento y el rol.
-  // ENVIO: origen = FDM, destino = Técnico
-  // RECOGIDA: origen = Técnico, destino = FDM
-  const origenRol = envio.tipo === "ENVIO" ? "FDM" : "TECNICO";
-  const destinoRol = envio.tipo === "ENVIO" ? "TECNICO" : "FDM";
+  // ENVIO: origen = almacén (FDM o Admira), destino = Técnico
+  // RECOGIDA: origen = Técnico, destino = almacén (FDM o Admira)
+  const origenRol = envio.tipo === "ENVIO" ? envio.almacen : "TECNICO";
+  const destinoRol = envio.tipo === "ENVIO" ? "TECNICO" : envio.almacen;
 
   let side: "origen" | "destino";
   if (session.role === origenRol && !envio.items.every((i) => i.escaneadoOrigen)) {
@@ -88,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data:
         envio.tipo === "ENVIO"
           ? { estado: "EN_TECNICO", tecnicoId: envio.tecnicoId }
-          : { estado: "EN_FDM", tecnicoId: null },
+          : { estado: envio.almacen === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM", tecnicoId: null },
     });
   }
 
@@ -121,7 +127,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         await crearNotificacion({
           userId: envio.creadoPorId,
           tipo: "ENVIO_EN_CAMINO",
-          titulo: "Recogida en camino a FDM",
+          titulo: `Recogida en camino a ${envio.almacen === "ADMIRA" ? "Admira" : "FDM"}`,
           mensaje: `${refreshed.items.length} artículo(s) por ${envio.transportista}, desde ${envio.origen}.`,
           entidadTipo: "envio",
           entidadId: envio.id,
@@ -137,7 +143,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         await crearNotificacion({
           userId: envio.creadoPorId,
           tipo: "ENVIO_RECIBIDO",
-          titulo: envio.tipo === "ENVIO" ? "Envío confirmado por el técnico" : "Recogida confirmada en FDM",
+          titulo:
+            envio.tipo === "ENVIO"
+              ? "Envío confirmado por el técnico"
+              : `Recogida confirmada en ${envio.almacen === "ADMIRA" ? "Admira" : "FDM"}`,
           mensaje: `${refreshed.items.length} artículo(s) recibidos en ${envio.destino}.`,
           entidadTipo: "envio",
           entidadId: envio.id,

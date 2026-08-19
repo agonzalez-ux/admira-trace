@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { TIPO_MATERIAL_LABELS, TRANSPORTISTAS, FRECUENCIAS_RECURRENTES } from "@/lib/constants";
+import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 
 type Tecnico = { id: string; name: string; zona: string | null };
 type Material = { id: string; numeroSerie: string; tipo: string; nombre: string; estado: string; tecnicoId: string | null };
@@ -10,6 +11,11 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [materiales, setMateriales] = useState<Material[]>([]);
   const [tipo, setTipo] = useState<"ENVIO" | "RECOGIDA">("ENVIO");
+  // Qué almacén es el otro lado del movimiento (además del técnico): de dónde
+  // sale el envío, o a dónde vuelve la recogida. Admira y FDM tienen cada uno
+  // su propio stock, así que hay que elegir uno — un envío no puede salir
+  // físicamente de los dos almacenes a la vez.
+  const [almacen, setAlmacen] = useState<"FDM" | "ADMIRA">("FDM");
   const [tecnicoId, setTecnicoId] = useState("");
   const [transportista, setTransportista] = useState<(typeof TRANSPORTISTAS)[number]>("MARESA");
   const [selected, setSelected] = useState<string[]>([]);
@@ -36,13 +42,11 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     setCategoriaAbierta(null);
 
     if (tipo === "ENVIO") {
-      // El material a enviar puede estar en el almacén de FDM o en el de Admira.
-      Promise.all([
-        fetch("/api/materiales?estado=EN_FDM").then((r) => r.json()),
-        fetch("/api/materiales?estado=EN_ADMIRA").then((r) => r.json()),
-      ]).then(([fdm, admira]) => {
-        setMateriales([...(fdm.materiales || []), ...(admira.materiales || [])]);
-      });
+      // El material a enviar sale de un único almacén (el elegido): un envío
+      // no puede salir a la vez del de FDM y del de Admira.
+      fetch(`/api/materiales?estado=${almacen === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM"}`)
+        .then((r) => r.json())
+        .then((d) => setMateriales(d.materiales || []));
       return;
     }
 
@@ -53,10 +57,11 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     fetch(`/api/materiales?tecnicoId=${tecnicoId}&estado=EN_TECNICO`)
       .then((r) => r.json())
       .then((d) => setMateriales(d.materiales || []));
-  }, [tipo, tecnicoId]);
+  }, [tipo, tecnicoId, almacen]);
 
-  const origen = tipo === "ENVIO" ? "Almacén FDM / Admira" : tecnicos.find((t) => t.id === tecnicoId)?.name || "";
-  const destino = tipo === "ENVIO" ? tecnicos.find((t) => t.id === tecnicoId)?.name || "" : "Almacén FDM / Admira";
+  const nombreAlmacen = `Almacén ${almacen === "ADMIRA" ? "Admira" : "FDM"}`;
+  const origen = tipo === "ENVIO" ? nombreAlmacen : tecnicos.find((t) => t.id === tecnicoId)?.name || "";
+  const destino = tipo === "ENVIO" ? tecnicos.find((t) => t.id === tecnicoId)?.name || "" : nombreAlmacen;
 
   // Material agrupado por categoría, aplicando el buscador.
   const porCategoria = useMemo(() => {
@@ -100,6 +105,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
         transportista,
         origen,
         destino,
+        almacen,
         tecnicoId,
         materialIds: selected,
         esRecurrente,
@@ -145,13 +151,23 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Técnico</label>
-        <select value={tecnicoId} onChange={(e) => setTecnicoId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
-          <option value="">— Selecciona técnico —</option>
-          {tecnicos.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}{t.zona ? ` · ${t.zona}` : ""}</option>
-          ))}
+        <label className="block text-xs font-medium text-slate-600 mb-1">
+          {tipo === "ENVIO" ? "¿De qué almacén sale?" : "¿A qué almacén vuelve?"}
+        </label>
+        <select value={almacen} onChange={(e) => setAlmacen(e.target.value as any)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
+          <option value="FDM">Almacén FDM</option>
+          <option value="ADMIRA">Almacén Admira</option>
         </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">Técnico</label>
+        <TecnicoCombobox
+          tecnicos={tecnicos}
+          value={tecnicoId}
+          onChange={setTecnicoId}
+          placeholder="Buscar técnico por nombre o ciudad…"
+          className="text-sm"
+        />
       </div>
       {tecnicoId && <div className="text-xs text-slate-500">{origen} → {destino}</div>}
 
