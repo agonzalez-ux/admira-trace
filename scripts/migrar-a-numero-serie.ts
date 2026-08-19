@@ -8,13 +8,22 @@
  * Regla: si el material ya tiene numeroSerie (p. ej. capturado por OCR), se
  * respeta tal cual. Si no lo tiene, se rellena con el código de barras actual
  * (que ya era único), para que ningún material se quede sin identificador.
+ *
+ * OJO: usa SQL directo ($queryRawUnsafe/$executeRawUnsafe) en vez del cliente
+ * de Prisma tipado a propósito. Este script se ejecuta con el código YA
+ * actualizado (mismo despliegue que trae el esquema nuevo sin `codigoBarras`),
+ * así que el cliente generado ya no reconocería ese campo y cualquier consulta
+ * tipada que lo mencionase fallaría en tiempo de ejecución. El SQL directo no
+ * depende del esquema con el que se generó el cliente, solo de que la columna
+ * siga existiendo físicamente en la base de datos en el momento de ejecutarlo
+ * — cosa que es cierta justo antes de que arranque el contenedor nuevo.
  */
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  const materiales = await prisma.material.findMany({
-    select: { id: true, codigoBarras: true, numeroSerie: true },
-  });
+  const materiales = await prisma.$queryRawUnsafe<{ id: string; codigoBarras: string; numeroSerie: string | null }[]>(
+    `SELECT "id", "codigoBarras", "numeroSerie" FROM "Material"`
+  );
 
   let rellenados = 0;
   let yaTenian = 0;
@@ -24,10 +33,7 @@ async function main() {
       yaTenian++;
       continue;
     }
-    await prisma.material.update({
-      where: { id: m.id },
-      data: { numeroSerie: m.codigoBarras },
-    });
+    await prisma.$executeRawUnsafe(`UPDATE "Material" SET "numeroSerie" = ? WHERE "id" = ?`, m.codigoBarras, m.id);
     rellenados++;
   }
 
@@ -36,7 +42,9 @@ async function main() {
 
   // Comprobación de seguridad: si hubiera duplicados, la siguiente migración
   // de esquema (numeroSerie @unique) fallaría — mejor saberlo ahora.
-  const todos = await prisma.material.findMany({ select: { numeroSerie: true } });
+  const todos = await prisma.$queryRawUnsafe<{ numeroSerie: string | null }[]>(
+    `SELECT "numeroSerie" FROM "Material"`
+  );
   const conteo = new Map<string, number>();
   for (const m of todos) {
     const v = m.numeroSerie || "";
