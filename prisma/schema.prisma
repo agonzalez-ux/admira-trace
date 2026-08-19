@@ -125,14 +125,17 @@ model OrdenRecurrente {
 // estado: EN_FDM | EN_ADMIRA | EN_TRANSITO_ENVIO | EN_TECNICO | EN_TRANSITO_RECOGIDA | INSTALADO | BAJA
 model Material {
   id           String   @id @default(cuid())
-  codigoBarras String   @unique
+  // Identificador real del material: así es como Admira lo trackea y como
+  // aparece en el Excel de stock. Puede rellenarse escaneando el código de
+  // barras de la etiqueta (muchos fabricantes codifican ahí el propio número
+  // de serie) o haciendo una foto con el lector OCR.
+  numeroSerie  String   @unique
   tipo         String
   // Cuando el tipo es "OTRO", aquí se guarda qué es exactamente
   // (lo escribe quien da de alta el material).
   tipoPersonalizado String?
   nombre       String
   descripcion  String?
-  numeroSerie  String?
   estado       String   @default("EN_FDM")
   tecnicoId    String?
   tecnico      User?    @relation("MaterialTecnico", fields: [tecnicoId], references: [id])

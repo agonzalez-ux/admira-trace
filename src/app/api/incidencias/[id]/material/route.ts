@@ -15,10 +15,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const body = await req.json().catch(() => null);
-  const codigoBarras = body?.codigoBarras?.trim();
-  if (!codigoBarras) return NextResponse.json({ error: "Código de barras requerido." }, { status: 400 });
+  const numeroSerie = body?.numeroSerie?.trim();
+  if (!numeroSerie) return NextResponse.json({ error: "Número de serie requerido." }, { status: 400 });
 
-  const material = await prisma.material.findUnique({ where: { codigoBarras } });
+  const material = await prisma.material.findUnique({ where: { numeroSerie } });
   if (!material) return NextResponse.json({ error: "Material no encontrado." }, { status: 404 });
   if (material.tecnicoId !== session.userId) {
     return NextResponse.json({ error: "Ese material no está registrado en tu inventario." }, { status: 409 });

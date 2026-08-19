@@ -10,7 +10,7 @@ import {
 
 type Material = {
   id: string;
-  codigoBarras: string;
+  numeroSerie: string;
   tipo: string;
   nombre: string;
 };
@@ -79,7 +79,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
     const res = await fetch(`/api/envios/${scanTarget.id}/scan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigoBarras: code }),
+      body: JSON.stringify({ numeroSerie: code }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -107,7 +107,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
           e.origen.toLowerCase().includes(q) ||
           e.destino.toLowerCase().includes(q) ||
           e.items.some(
-            (i) => i.material.nombre.toLowerCase().includes(q) || i.material.codigoBarras.toLowerCase().includes(q)
+            (i) => i.material.nombre.toLowerCase().includes(q) || i.material.numeroSerie.toLowerCase().includes(q)
           )
       )
     : listaBase;
@@ -148,7 +148,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
       <input
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar por técnico, origen/destino o material (nombre o código)…"
+        placeholder="Buscar por técnico, origen/destino o material (nombre o número de serie)…"
         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
       />
 
@@ -199,7 +199,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
               {envio.items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-2 py-1.5">
                   <div>
-                    <span className="font-mono text-slate-600">{item.material.codigoBarras}</span>{" "}
+                    <span className="font-mono text-slate-600">{item.material.numeroSerie}</span>{" "}
                     <span className="text-slate-500">
                       · {TIPO_MATERIAL_LABELS[item.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || item.material.tipo} ·{" "}
                       {item.material.nombre}

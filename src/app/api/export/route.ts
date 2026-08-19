@@ -23,10 +23,9 @@ function styleHeader(sheet: ExcelJS.Worksheet) {
 async function buildMateriales(workbook: ExcelJS.Workbook) {
   const sheet = workbook.addWorksheet("Material");
   sheet.columns = [
-    { header: "Código de barras", key: "codigoBarras", width: 20 },
+    { header: "Número de serie", key: "numeroSerie", width: 20 },
     { header: "Tipo", key: "tipo", width: 16 },
     { header: "Nombre", key: "nombre", width: 28 },
-    { header: "Nº serie", key: "numeroSerie", width: 18 },
     { header: "Estado", key: "estado", width: 22 },
     { header: "Técnico actual", key: "tecnico", width: 22 },
     { header: "Zona", key: "zona", width: 16 },
@@ -37,10 +36,9 @@ async function buildMateriales(workbook: ExcelJS.Workbook) {
   const materiales = await prisma.material.findMany({ include: { tecnico: true }, orderBy: { createdAt: "desc" } });
   for (const m of materiales) {
     sheet.addRow({
-      codigoBarras: m.codigoBarras,
+      numeroSerie: m.numeroSerie,
       tipo: etiquetaTipo(m),
       nombre: m.nombre,
-      numeroSerie: m.numeroSerie || "",
       estado: ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado,
       tecnico: m.tecnico?.name || "",
       zona: m.tecnico?.zona || "",
@@ -63,7 +61,7 @@ async function buildEnvios(workbook: ExcelJS.Workbook) {
     { header: "Estado", key: "estado", width: 26 },
     { header: "Recurrente", key: "recurrente", width: 12 },
     { header: "Nº material", key: "numMaterial", width: 12 },
-    { header: "Códigos de barras", key: "codigos", width: 40 },
+    { header: "Números de serie", key: "codigos", width: 40 },
     { header: "Creado por", key: "creadoPor", width: 18 },
     { header: "Fecha creación", key: "fechaCreacion", width: 20 },
     { header: "Fecha enviado", key: "fechaEnviado", width: 20 },
@@ -84,7 +82,7 @@ async function buildEnvios(workbook: ExcelJS.Workbook) {
       estado: ESTADO_ENVIO_LABELS[e.estado as keyof typeof ESTADO_ENVIO_LABELS] || e.estado,
       recurrente: e.esRecurrente ? "Sí" : "No",
       numMaterial: e.items.length,
-      codigos: e.items.map((i) => i.material.codigoBarras).join(", "),
+      codigos: e.items.map((i) => i.material.numeroSerie).join(", "),
       creadoPor: e.creadoPor?.name || "",
       fechaCreacion: e.fechaCreacion.toLocaleString("es-ES"),
       fechaEnviado: e.fechaEnviado ? e.fechaEnviado.toLocaleString("es-ES") : "",
@@ -126,7 +124,7 @@ async function buildIncidencias(workbook: ExcelJS.Workbook) {
       direccion: i.direccion || "",
       tecnico: i.tecnico?.name || "(sin asignar)",
       estado: ESTADO_INCIDENCIA_LABELS[i.estado as keyof typeof ESTADO_INCIDENCIA_LABELS] || i.estado,
-      materiales: i.materialesUsados.map((m) => m.material.codigoBarras).join(", "),
+      materiales: i.materialesUsados.map((m) => m.material.numeroSerie).join(", "),
       numFotos: i.fotos.length,
       fechaAsignacion: i.fechaAsignacion ? i.fechaAsignacion.toLocaleString("es-ES") : "",
       fechaEnCamino: i.fechaEnCamino ? i.fechaEnCamino.toLocaleString("es-ES") : "",

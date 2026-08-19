@@ -171,12 +171,11 @@ async function syncMateriales() {
   await writeSheet(
     t.spreadsheetId,
     t.tab,
-    ["Código de barras", "Tipo", "Nombre", "Nº serie", "Estado", "Técnico actual", "Zona", "Creado", "Actualizado"],
+    ["Número de serie", "Tipo", "Nombre", "Estado", "Técnico actual", "Zona", "Creado", "Actualizado"],
     materiales.map((m) => [
-      m.codigoBarras,
+      m.numeroSerie,
       etiquetaTipo(m),
       m.nombre,
-      m.numeroSerie || "",
       ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado,
       m.tecnico?.name || "",
       m.tecnico?.zona || "",
@@ -204,7 +203,7 @@ async function syncEnvios() {
       "Estado",
       "Recurrente",
       "Nº material",
-      "Códigos de barras",
+      "Números de serie",
       "Creado por",
       "Fecha creación",
       "Fecha enviado",
@@ -220,7 +219,7 @@ async function syncEnvios() {
       ESTADO_ENVIO_LABELS[e.estado as keyof typeof ESTADO_ENVIO_LABELS] || e.estado,
       e.esRecurrente ? "Sí" : "No",
       e.items.length,
-      e.items.map((i) => i.material.codigoBarras).join(", "),
+      e.items.map((i) => i.material.numeroSerie).join(", "),
       e.creadoPor?.name || "",
       e.fechaCreacion.toLocaleString("es-ES"),
       e.fechaEnviado ? e.fechaEnviado.toLocaleString("es-ES") : "",
@@ -255,7 +254,7 @@ function filaIncidencia(i: {
   direccion: string | null;
   tecnico: { name: string } | null;
   estado: string;
-  materialesUsados: { material: { codigoBarras: string } }[];
+  materialesUsados: { material: { numeroSerie: string } }[];
   fotos: unknown[];
   fechaAsignacion: Date | null;
   fechaEnCamino: Date | null;
@@ -270,7 +269,7 @@ function filaIncidencia(i: {
     i.direccion || "",
     i.tecnico?.name || "(sin asignar)",
     ESTADO_INCIDENCIA_LABELS[i.estado as keyof typeof ESTADO_INCIDENCIA_LABELS] || i.estado,
-    i.materialesUsados.map((m) => m.material.codigoBarras).join(", "),
+    i.materialesUsados.map((m) => m.material.numeroSerie).join(", "),
     i.fotos.length,
     i.fechaAsignacion ? i.fechaAsignacion.toLocaleString("es-ES") : "",
     i.fechaEnCamino ? i.fechaEnCamino.toLocaleString("es-ES") : "",
@@ -416,7 +415,7 @@ async function syncIntervenciones() {
       i.tecnico?.name || "",
       TIPO_INCIDENCIA_LABELS[i.tipo as keyof typeof TIPO_INCIDENCIA_LABELS] || i.tipo,
       ESTADO_INCIDENCIA_LABELS[i.estado as keyof typeof ESTADO_INCIDENCIA_LABELS] || i.estado,
-      i.materialesUsados.map((m) => m.material.codigoBarras).join(", "),
+      i.materialesUsados.map((m) => m.material.numeroSerie).join(", "),
       i.origen === "DESK" ? "Presencial" : "",
       "",
       "",
@@ -473,9 +472,9 @@ async function syncCenso() {
         i.fechaImportada.toLocaleDateString("es-ES"),
         i.fechaResuelta ? i.fechaResuelta.toLocaleDateString("es-ES") : "",
         i.tecnico?.name || "",
-        i.materialesUsados.map((m) => m.material.codigoBarras).join(", "),
-        router?.numeroSerie || router?.codigoBarras || "",
-        pantalla?.numeroSerie || pantalla?.codigoBarras || "",
+        i.materialesUsados.map((m) => m.material.numeroSerie).join(", "),
+        router?.numeroSerie || "",
+        pantalla?.numeroSerie || "",
         i.descripcion || "",
         ultimaActualizacion.toLocaleString("es-ES"),
       ];

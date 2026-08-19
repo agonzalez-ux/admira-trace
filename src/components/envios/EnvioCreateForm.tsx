@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { TIPO_MATERIAL_LABELS, TRANSPORTISTAS, FRECUENCIAS_RECURRENTES } from "@/lib/constants";
 
 type Tecnico = { id: string; name: string; zona: string | null };
-type Material = { id: string; codigoBarras: string; tipo: string; nombre: string; estado: string; numeroSerie: string | null; tecnicoId: string | null };
+type Material = { id: string; numeroSerie: string; tipo: string; nombre: string; estado: string; tecnicoId: string | null };
 
 export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }) {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
@@ -62,12 +62,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   const porCategoria = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     const filtrados = q
-      ? materiales.filter(
-          (m) =>
-            m.nombre.toLowerCase().includes(q) ||
-            m.codigoBarras.toLowerCase().includes(q) ||
-            (m.numeroSerie || "").toLowerCase().includes(q)
-        )
+      ? materiales.filter((m) => m.nombre.toLowerCase().includes(q) || m.numeroSerie.toLowerCase().includes(q))
       : materiales;
 
     const map = new Map<string, Material[]>();
@@ -168,7 +163,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
         <input
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre, código de barras o nº de serie…"
+          placeholder="Buscar por nombre o número de serie…"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm mb-2"
         />
         <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg divide-y">
@@ -207,7 +202,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
                     {items.map((m) => (
                       <label key={m.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
                         <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggle(m.id)} />
-                        <span className="font-mono text-xs text-slate-500">{m.codigoBarras}</span>
+                        <span className="font-mono text-xs text-slate-500">{m.numeroSerie}</span>
                         <span className="truncate">{m.nombre}</span>
                         {m.estado === "EN_ADMIRA" && (
                           <span className="text-[10px] bg-admira-100 text-admira-700 rounded-full px-1.5 shrink-0">Admira</span>

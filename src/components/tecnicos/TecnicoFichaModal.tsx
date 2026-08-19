@@ -10,7 +10,7 @@ import {
 import OrdenesRecurrentes, { OrdenRecurrente } from "./OrdenesRecurrentes";
 import IncidenciaDetalle, { IncidenciaDetalleData } from "@/components/incidencias/IncidenciaDetalle";
 
-type Material = { id: string; codigoBarras: string; tipo: string; nombre: string; numeroSerie: string | null };
+type Material = { id: string; numeroSerie: string; tipo: string; nombre: string };
 type EnvioPendiente = {
   id: string;
   tipo: string;
@@ -154,7 +154,7 @@ export default function TecnicoFichaModal({ tecnicoId, onClose }: { tecnicoId: s
               <div className="space-y-1 max-h-40 overflow-y-auto">
                 {materialesVisibles.map((m) => (
                   <div key={m.id} className="text-xs text-slate-500 bg-slate-50 rounded-lg px-2 py-1.5 flex justify-between gap-2">
-                    <span className="font-mono shrink-0">{m.codigoBarras}</span>
+                    <span className="font-mono shrink-0">{m.numeroSerie}</span>
                     <span className="truncate text-right">
                       {TIPO_MATERIAL_LABELS[m.tipo as keyof typeof TIPO_MATERIAL_LABELS] || m.tipo} · {m.nombre}
                     </span>
@@ -190,7 +190,7 @@ export default function TecnicoFichaModal({ tecnicoId, onClose }: { tecnicoId: s
                         <div className="mt-1 space-y-0.5">
                           {e.items.map((i) => (
                             <div key={i.id} className="text-[11px] text-slate-500 flex justify-between gap-2">
-                              <span className="font-mono shrink-0">{i.material.codigoBarras}</span>
+                              <span className="font-mono shrink-0">{i.material.numeroSerie}</span>
                               <span className="truncate">{i.material.nombre}</span>
                               <span className="shrink-0">{i.escaneadoDestino ? "✓" : "…"}</span>
                             </div>
@@ -257,7 +257,7 @@ export default function TecnicoFichaModal({ tecnicoId, onClose }: { tecnicoId: s
                     </div>
                     {inc.materialesUsados.length > 0 && (
                       <div className="text-xs text-slate-400 mt-1">
-                        Material: {inc.materialesUsados.map((m) => m.material.codigoBarras).join(", ")}
+                        Material: {inc.materialesUsados.map((m) => m.material.numeroSerie).join(", ")}
                       </div>
                     )}
                     <div className="text-[10px] text-admira-600 mt-1">Ver todos los detalles →</div>

@@ -35,7 +35,7 @@ export type IncidenciaDetalleData = {
     correoComercial: string | null;
   } | null;
   fotos: { id: string; url: string }[];
-  materialesUsados: { id: string; material: { codigoBarras: string; nombre: string; tipo: string } }[];
+  materialesUsados: { id: string; material: { numeroSerie: string; nombre: string; tipo: string } }[];
 };
 
 type EstancoResultado = { id: string; idEstanco: string; nombre: string; municipio: string | null; provincia: string | null };
@@ -341,7 +341,7 @@ export default function IncidenciaDetalle({
                 <div className="space-y-1">
                   {inc.materialesUsados.map((m) => (
                     <div key={m.id} className="text-xs bg-slate-50 rounded-lg px-2 py-1.5">
-                      <span className="font-mono text-slate-600">{m.material.codigoBarras}</span>
+                      <span className="font-mono text-slate-600">{m.material.numeroSerie}</span>
                       <span className="text-slate-500">
                         {" · "}
                         {TIPO_MATERIAL_LABELS[m.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || m.material.tipo} ·{" "}

@@ -35,18 +35,18 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { codigoBarras, tipo, tipoPersonalizado, nombre, descripcion, numeroSerie } = body || {};
+  const { numeroSerie, tipo, tipoPersonalizado, nombre, descripcion } = body || {};
 
-  if (!codigoBarras || !tipo || !nombre) {
+  if (!numeroSerie || !tipo || !nombre) {
     return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
   }
   if (tipo === "OTRO" && !String(tipoPersonalizado || "").trim()) {
     return NextResponse.json({ error: "Indica qué tipo de material es." }, { status: 400 });
   }
 
-  const existing = await prisma.material.findUnique({ where: { codigoBarras } });
+  const existing = await prisma.material.findUnique({ where: { numeroSerie } });
   if (existing) {
-    return NextResponse.json({ error: "Ya existe un material con ese código de barras." }, { status: 409 });
+    return NextResponse.json({ error: "Ya existe un material con ese número de serie." }, { status: 409 });
   }
 
   // Cada rol da de alta el material en su propio almacén: FDM en el suyo,
@@ -56,12 +56,11 @@ export async function POST(req: NextRequest) {
 
   const material = await prisma.material.create({
     data: {
-      codigoBarras,
+      numeroSerie,
       tipo,
       tipoPersonalizado: tipo === "OTRO" ? String(tipoPersonalizado).trim() : null,
       nombre,
       descripcion: descripcion || null,
-      numeroSerie: numeroSerie || null,
       estado: estadoInicial,
       ubicacion: `Almacén ${almacen}`,
     },

@@ -6,12 +6,11 @@ import { etiquetaTipo } from "@/lib/materialLabel";
 
 type Material = {
   id: string;
-  codigoBarras: string;
+  numeroSerie: string;
   tipo: string;
   tipoPersonalizado: string | null;
   nombre: string;
   estado: string;
-  numeroSerie: string | null;
 };
 
 const ESTADO_COLORS: Record<string, string> = {
@@ -51,10 +50,7 @@ export default function MiMaterialList({ tecnicoId, tecnicoLabel }: { tecnicoId?
     const q = busqueda.trim().toLowerCase();
     if (q) {
       lista = lista.filter(
-        (m) =>
-          m.nombre.toLowerCase().includes(q) ||
-          m.codigoBarras.toLowerCase().includes(q) ||
-          (m.numeroSerie || "").toLowerCase().includes(q)
+        (m) => m.nombre.toLowerCase().includes(q) || m.numeroSerie.toLowerCase().includes(q)
       );
     }
     return lista;
@@ -70,7 +66,7 @@ export default function MiMaterialList({ tecnicoId, tecnicoLabel }: { tecnicoId?
         <input
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre, código de barras o nº de serie…"
+          placeholder="Buscar por nombre o número de serie…"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm mb-3"
         />
       )}
@@ -108,11 +104,10 @@ export default function MiMaterialList({ tecnicoId, tecnicoLabel }: { tecnicoId?
         {visibles.map((m) => (
           <div key={m.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between">
             <div>
-              <div className="font-mono text-xs text-slate-500">{m.codigoBarras}</div>
+              <div className="font-mono text-xs text-slate-500">S/N: {m.numeroSerie}</div>
               <div className="text-sm font-medium text-slate-800">
                 {etiquetaTipo(m)} · {m.nombre}
               </div>
-              {m.numeroSerie && <div className="text-xs text-slate-400">S/N: {m.numeroSerie}</div>}
             </div>
             <span className={`text-[11px] rounded-full px-2 py-1 whitespace-nowrap ${ESTADO_COLORS[m.estado] || "bg-slate-100"}`}>
               {ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado}

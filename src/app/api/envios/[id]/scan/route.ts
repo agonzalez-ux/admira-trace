@@ -11,9 +11,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const body = await req.json().catch(() => null);
-  const codigoBarras = body?.codigoBarras?.trim();
-  if (!codigoBarras) {
-    return NextResponse.json({ error: "Código de barras requerido." }, { status: 400 });
+  const numeroSerie = body?.numeroSerie?.trim();
+  if (!numeroSerie) {
+    return NextResponse.json({ error: "Número de serie requerido." }, { status: 400 });
   }
 
   const envio = await prisma.envio.findUnique({
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "No te corresponde escanear este envío en este momento." }, { status: 403 });
   }
 
-  const item = envio.items.find((i) => i.material.codigoBarras === codigoBarras);
+  const item = envio.items.find((i) => i.material.numeroSerie === numeroSerie);
   if (!item) {
     return NextResponse.json({ error: "Ese material no pertenece a este envío." }, { status: 404 });
   }

@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
 /**
- * Deduce el tipo de material a partir del código de barras.
+ * Deduce el tipo de material a partir del número de serie.
  *
- * Los códigos internos siguen el patrón ALMACEN-TIPO-NNNN (p. ej. FDM-PANT-0001,
+ * Los números internos siguen el patrón ALMACEN-TIPO-NNNN (p. ej. FDM-PANT-0001,
  * TEC-ROUT-0100), así que el segmento del medio identifica el tipo. También se
- * reconocen palabras sueltas por si el código viene con otro formato.
+ * reconocen palabras sueltas por si el número viene con otro formato (p. ej. un
+ * número de serie real de fábrica).
  */
 const PISTAS: { patrones: string[]; tipo: string }[] = [
   { patrones: ["PANT", "TFT", "SCREEN", "DISPLAY", "MONITOR"], tipo: "PANTALLA" },
@@ -41,19 +42,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
-  const codigoBarras = (req.nextUrl.searchParams.get("codigoBarras") || "").trim();
-  if (!codigoBarras) return NextResponse.json({ error: "Falta el código de barras." }, { status: 400 });
+  const numeroSerie = (req.nextUrl.searchParams.get("numeroSerie") || "").trim();
+  if (!numeroSerie) return NextResponse.json({ error: "Falta el número de serie." }, { status: 400 });
 
   // Si ya existe, se avisa: evita dar de alta dos veces la misma pieza.
   const existente = await prisma.material.findUnique({
-    where: { codigoBarras },
+    where: { numeroSerie },
     include: { tecnico: { select: { name: true } } },
   });
   if (existente) {
     return NextResponse.json({
       existe: true,
       material: {
-        codigoBarras: existente.codigoBarras,
+        numeroSerie: existente.numeroSerie,
         tipo: existente.tipo,
         tipoPersonalizado: existente.tipoPersonalizado,
         nombre: existente.nombre,
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const tipoDeducido = deducirTipo(codigoBarras);
+  const tipoDeducido = deducirTipo(numeroSerie);
 
   // Para rellenar nombre y descripción se usa el último material real dado de
   // alta de ese mismo tipo: como se registran muchas piezas iguales, casi
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
     if (referencia) {
       sugerencia.nombre = referencia.nombre;
       sugerencia.descripcion = referencia.descripcion || "";
-      sugerencia.basadoEn = referencia.codigoBarras;
+      sugerencia.basadoEn = referencia.numeroSerie;
     }
   }
 

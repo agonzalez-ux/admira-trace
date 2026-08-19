@@ -6,12 +6,11 @@ import { etiquetaTipo } from "@/lib/materialLabel";
 
 type Material = {
   id: string;
-  codigoBarras: string;
+  numeroSerie: string;
   tipo: string;
   tipoPersonalizado: string | null;
   nombre: string;
   estado: string;
-  numeroSerie: string | null;
   tecnico: { id: string; name: string; zona: string | null } | null;
 };
 
@@ -93,11 +92,10 @@ function MaterialCard({ m }: { m: Material }) {
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between">
       <div>
-        <div className="font-mono text-xs text-slate-500">{m.codigoBarras}</div>
+        <div className="font-mono text-xs text-slate-500">S/N: {m.numeroSerie}</div>
         <div className="text-sm font-medium text-slate-800">
           {etiquetaTipo(m)} · {m.nombre}
         </div>
-        {m.numeroSerie && <div className="text-xs text-slate-400">S/N: {m.numeroSerie}</div>}
       </div>
       <span className={`text-[11px] rounded-full px-2 py-1 whitespace-nowrap ${ESTADO_COLORS[m.estado] || "bg-slate-100"}`}>
         {ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado}

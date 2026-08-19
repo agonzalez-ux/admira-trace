@@ -57,27 +57,27 @@ async function main() {
   });
 
   const materialesData = [
-    { codigoBarras: "FDM-PANT-0001", tipo: "PANTALLA", nombre: 'Pantalla LG 55" ', estado: "EN_FDM" },
-    { codigoBarras: "FDM-PANT-0002", tipo: "PANTALLA", nombre: 'Pantalla LG 55" ', estado: "EN_FDM" },
-    { codigoBarras: "FDM-ROUT-0001", tipo: "ROUTER", nombre: "Router Teltonika RUT240", estado: "EN_FDM" },
-    { codigoBarras: "FDM-ROUT-0002", tipo: "ROUTER", nombre: "Router Teltonika RUT240", estado: "EN_FDM" },
-    { codigoBarras: "FDM-REPR-0001", tipo: "REPRODUCTOR", nombre: "Reproductor BrightSign XT1145", estado: "EN_FDM" },
+    { numeroSerie: "FDM-PANT-0001", tipo: "PANTALLA", nombre: 'Pantalla LG 55" ', estado: "EN_FDM" },
+    { numeroSerie: "FDM-PANT-0002", tipo: "PANTALLA", nombre: 'Pantalla LG 55" ', estado: "EN_FDM" },
+    { numeroSerie: "FDM-ROUT-0001", tipo: "ROUTER", nombre: "Router Teltonika RUT240", estado: "EN_FDM" },
+    { numeroSerie: "FDM-ROUT-0002", tipo: "ROUTER", nombre: "Router Teltonika RUT240", estado: "EN_FDM" },
+    { numeroSerie: "FDM-REPR-0001", tipo: "REPRODUCTOR", nombre: "Reproductor BrightSign XT1145", estado: "EN_FDM" },
     {
-      codigoBarras: "TEC-PANT-0100",
+      numeroSerie: "TEC-PANT-0100",
       tipo: "PANTALLA",
       nombre: 'Pantalla Samsung 43"',
       estado: "EN_TECNICO",
       tecnicoId: tecnico.id,
     },
     {
-      codigoBarras: "TEC-ROUT-0100",
+      numeroSerie: "TEC-ROUT-0100",
       tipo: "ROUTER",
       nombre: "Router Teltonika RUT240",
       estado: "EN_TECNICO",
       tecnicoId: tecnico.id,
     },
     {
-      codigoBarras: "TEC2-PANT-0200",
+      numeroSerie: "TEC2-PANT-0200",
       tipo: "PANTALLA",
       nombre: 'Pantalla LG 49"',
       estado: "EN_TECNICO",
@@ -87,7 +87,7 @@ async function main() {
 
   for (const m of materialesData) {
     await prisma.material.upsert({
-      where: { codigoBarras: m.codigoBarras },
+      where: { numeroSerie: m.numeroSerie },
       update: {},
       create: m,
     });
@@ -137,7 +137,7 @@ async function main() {
         notas: "Envío para reposición de stock recurrente.",
       },
     });
-    const mat = await prisma.material.findUnique({ where: { codigoBarras: "FDM-PANT-0001" } });
+    const mat = await prisma.material.findUnique({ where: { numeroSerie: "FDM-PANT-0001" } });
     if (mat) {
       await prisma.envioItem.create({ data: { envioId: envio.id, materialId: mat.id } });
     }

@@ -12,7 +12,7 @@ import {
 } from "@/lib/constants";
 
 type Foto = { id: string; url: string; fecha: string };
-type MaterialUsado = { id: string; material: { codigoBarras: string; nombre: string; tipo: string } };
+type MaterialUsado = { id: string; material: { numeroSerie: string; nombre: string; tipo: string } };
 type Tecnico = { id: string; name: string; zona: string | null; phone: string | null };
 type EstancoInfo = { nombre: string; comercial: string | null; correoComercial: string | null };
 type TecnicoCercano = { id: string; name: string; zona: string | null; distanciaKm: number | null };
@@ -378,7 +378,7 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
     const res = await fetch(`/api/incidencias/${scanTarget}/material`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigoBarras: code }),
+      body: JSON.stringify({ numeroSerie: code }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -595,7 +595,7 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
                       {inc.materialesUsados
                         .map(
                           (m) =>
-                            `${TIPO_MATERIAL_LABELS[m.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || m.material.tipo} (${m.material.codigoBarras})`
+                            `${TIPO_MATERIAL_LABELS[m.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || m.material.tipo} (${m.material.numeroSerie})`
                         )
                         .join(", ")}
                     </div>
