@@ -1,8 +1,12 @@
 /**
- * Corrección puntual de 2 incidencias que el emparejador antiguo (por nombre)
+ * Corrección puntual de incidencias que el emparejador antiguo (por nombre)
  * vinculó a un estanco equivocado, detectadas al comparar contra el código
  * ITG del ticket (ver commit "Emparejar estancos por código ITG y teléfono").
- * No toca nada más: solo estas 2, identificadas por su título exacto.
+ *
+ * OJO: se filtra explícitamente por origen "DESK" — el mismo texto puede
+ * aparecer también en una incidencia de origen "HARDWARE" (monitorización de
+ * pantallas), que es una incidencia distinta aunque hable del mismo estanco.
+ * findFirst sin este filtro puede coger la incorrecta.
  */
 import { prisma } from "../src/lib/prisma";
 
@@ -13,12 +17,12 @@ const CASOS = [
 
 async function main() {
   for (const caso of CASOS) {
-    const inc = await prisma.incidencia.findFirst({
-      where: { titulo: { contains: caso.contieneTitulo } },
+    const incidencias = await prisma.incidencia.findMany({
+      where: { origen: "DESK", titulo: { contains: caso.contieneTitulo } },
       include: { estanco: true },
     });
-    if (!inc) {
-      console.log(`[omitido] No se encontró ninguna incidencia con "${caso.contieneTitulo}"`);
+    if (incidencias.length === 0) {
+      console.log(`[omitido] No se encontró ninguna incidencia DESK con "${caso.contieneTitulo}"`);
       continue;
     }
     const correcto = await prisma.estanco.findUnique({ where: { idEstanco: caso.idEstancoCorrecto } });
@@ -26,17 +30,19 @@ async function main() {
       console.log(`[error] No existe el estanco idEstanco=${caso.idEstancoCorrecto}`);
       continue;
     }
-    if (inc.estancoId === correcto.id) {
-      console.log(`[ya correcto] ${inc.titulo.slice(0, 60)} ya está vinculada a ${correcto.idEstanco} ${correcto.nombre}`);
-      continue;
+    for (const inc of incidencias) {
+      if (inc.estancoId === correcto.id) {
+        console.log(`[ya correcto] ${inc.titulo.slice(0, 60)} ya está vinculada a ${correcto.idEstanco} ${correcto.nombre}`);
+        continue;
+      }
+      console.log(
+        `[corrigiendo DESK] ${inc.titulo.slice(0, 60)}\n  antes: ${inc.estanco?.idEstanco || "(sin estanco)"} ${inc.estanco?.nombre || ""}\n  ahora: ${correcto.idEstanco} ${correcto.nombre}`
+      );
+      await prisma.incidencia.update({
+        where: { id: inc.id },
+        data: { estancoId: correcto.id, estancoMatchConfianza: 1 },
+      });
     }
-    console.log(
-      `[corrigiendo] ${inc.titulo.slice(0, 60)}\n  antes: ${inc.estanco?.idEstanco} ${inc.estanco?.nombre}\n  ahora: ${correcto.idEstanco} ${correcto.nombre}`
-    );
-    await prisma.incidencia.update({
-      where: { id: inc.id },
-      data: { estancoId: correcto.id, estancoMatchConfianza: 1 },
-    });
   }
 }
 
