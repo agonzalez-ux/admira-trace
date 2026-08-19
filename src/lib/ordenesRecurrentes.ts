@@ -1,17 +1,6 @@
 import { prisma } from "./prisma";
 import { syncToSheets } from "./googleSheets";
-
-export type MaterialConfigItem = { tipo: string; cantidad: number };
-
-export function parseMaterialConfig(json: string): MaterialConfigItem[] {
-  try {
-    const parsed = JSON.parse(json);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((i) => i && typeof i.tipo === "string" && Number(i.cantidad) > 0);
-  } catch {
-    return [];
-  }
-}
+import { parsePedido, nombreAlmacen } from "./envioLabel";
 
 export function calcularProximaEjecucion(desde: Date, frecuenciaDias: number): Date {
   const proxima = new Date(desde);
@@ -21,11 +10,10 @@ export function calcularProximaEjecucion(desde: Date, frecuenciaDias: number): D
 
 /**
  * Ejecuta las órdenes recurrentes cuya fecha ya ha llegado: crea un envío por
- * cada una, cogiendo material disponible en almacén (FDM o Admira) según la
- * configuración de tipos/cantidades.
- *
- * Si no hay stock suficiente de un tipo, se envía lo que haya y se anota en las
- * notas del envío — nunca se inventa material que no existe.
+ * cada una, con el mismo pedido por categorías que la orden. No se preselecciona
+ * ninguna pieza concreta — igual que un envío normal, el almacén escaneará las
+ * unidades reales al prepararlo (si no hay stock suficiente de algo, lo
+ * descubrirá ahí y podrá cerrar el envío con lo que haya, avisando a Admira).
  */
 export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generados: number; detalles: string[] }> {
   const ahora = new Date();
@@ -38,8 +26,8 @@ export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generado
   let generados = 0;
 
   for (const orden of pendientes) {
-    const config = parseMaterialConfig(orden.materialConfig);
-    if (config.length === 0) {
+    const pedido = parsePedido(orden.materialConfig);
+    if (pedido.length === 0) {
       detalles.push(`Orden ${orden.id}: configuración de material vacía, se salta.`);
       await prisma.ordenRecurrente.update({
         where: { id: orden.id },
@@ -48,49 +36,22 @@ export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generado
       continue;
     }
 
-    const materialIds: string[] = [];
-    const avisos: string[] = [];
-
-    const estadoAlmacen = orden.almacen === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM";
-
-    for (const item of config) {
-      const disponibles = await prisma.material.findMany({
-        where: { tipo: item.tipo, estado: estadoAlmacen },
-        take: item.cantidad,
-        orderBy: { createdAt: "asc" },
-      });
-      materialIds.push(...disponibles.map((m) => m.id));
-      if (disponibles.length < item.cantidad) {
-        avisos.push(`${item.tipo}: pedidas ${item.cantidad}, disponibles ${disponibles.length}`);
-      }
-    }
-
-    if (materialIds.length === 0) {
-      detalles.push(`Orden ${orden.id} (${orden.tecnico.name}): sin stock disponible, no se genera envío.`);
-      await prisma.ordenRecurrente.update({
-        where: { id: orden.id },
-        data: { ultimaEjecucion: ahora, proximaEjecucion: calcularProximaEjecucion(ahora, orden.frecuenciaDias) },
-      });
-      continue;
-    }
-
     const notasPartes = ["Envío generado automáticamente por orden recurrente."];
     if (orden.notas) notasPartes.push(orden.notas);
-    if (avisos.length > 0) notasPartes.push(`Stock insuficiente — ${avisos.join("; ")}`);
 
     await prisma.envio.create({
       data: {
         tipo: "ENVIO",
         transportista: orden.transportista,
-        origen: `Almacén ${orden.almacen === "ADMIRA" ? "Admira" : "FDM"}`,
+        origen: nombreAlmacen(orden.almacen as "FDM" | "ADMIRA"),
         destino: orden.tecnico.name,
         almacen: orden.almacen,
         tecnicoId: orden.tecnicoId,
+        pedido: JSON.stringify(pedido),
         esRecurrente: true,
         ordenRecurrenteId: orden.id,
         notas: notasPartes.join(" · "),
         creadoPorId: orden.creadoPorId,
-        items: { create: materialIds.map((materialId) => ({ materialId })) },
       },
     });
 
@@ -100,11 +61,11 @@ export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generado
     });
 
     generados += 1;
-    detalles.push(`Orden ${orden.id} (${orden.tecnico.name}): envío creado con ${materialIds.length} piezas.`);
+    detalles.push(`Orden ${orden.id} (${orden.tecnico.name}): envío creado.`);
   }
 
   if (generados > 0) {
-    await syncToSheets(["envios", "materiales"]);
+    await syncToSheets(["envios"]);
   }
 
   return { generados, detalles };

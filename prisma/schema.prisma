@@ -124,7 +124,7 @@ model OrdenRecurrente {
 }
 
 // tipo: PANTALLA | ROUTER | REPRODUCTOR | SOPORTE | CABLEADO | MOBILIARIO | OTRO
-// estado: EN_FDM | EN_ADMIRA | EN_TRANSITO_ENVIO | EN_TECNICO | EN_TRANSITO_RECOGIDA | INSTALADO | BAJA
+// estado: EN_FDM | EN_ADMIRA | EN_TRANSITO_ENVIO | EN_TECNICO | EN_TRANSITO_RECOGIDA | EN_TRANSITO_TRANSFERENCIA | INSTALADO | BAJA
 model Material {
   id           String   @id @default(cuid())
   // Identificador real del material: así es como Admira lo trackea y como
@@ -164,12 +164,15 @@ model MaterialEvento {
   notas        String?
 }
 
-// tipo: ENVIO | RECOGIDA
+// tipo: ENVIO (almacén → técnico) | RECOGIDA (técnico → almacén) |
+//       TRANSFERENCIA (almacén → almacén, sin técnico de por medio)
 // transportista: MARESA | RENUS | OTRO
 // estado: PENDIENTE_PREPARACION | ENVIADO | EN_TRANSITO | RECIBIDO | INCIDENCIA
-// almacen: FDM | ADMIRA — qué almacén es el lado "almacén" de este movimiento
-// (el otro lado siempre es el técnico). Determina quién tiene que escanear
-// para confirmar el envío/recepción en ese extremo.
+//   (INCIDENCIA: la confirmación en origen o destino se cerró sin que
+//   coincidiera del todo con lo pedido/enviado — hace falta revisión manual)
+// almacen: FDM | ADMIRA — en ENVIO/RECOGIDA es el almacén que hace de
+// contraparte del técnico; en TRANSFERENCIA es el almacén de ORIGEN (el
+// destino es siempre el otro almacén, ya que solo hay dos).
 model Envio {
   id            String    @id @default(cuid())
   tipo          String    @default("ENVIO")
@@ -177,13 +180,20 @@ model Envio {
   origen        String
   destino       String
   almacen       String    @default("FDM")
-  tecnicoId     String
-  tecnico       User      @relation("EnvioTecnico", fields: [tecnicoId], references: [id])
+  // No aplica en TRANSFERENCIA (almacén → almacén, sin técnico).
+  tecnicoId     String?
+  tecnico       User?     @relation("EnvioTecnico", fields: [tecnicoId], references: [id])
   estado        String    @default("PENDIENTE_PREPARACION")
   esRecurrente  Boolean   @default(false)
   // Si viene de una orden recurrente, queda vinculado a ella para trazabilidad.
   ordenRecurrenteId String?
   ordenRecurrente   OrdenRecurrente? @relation(fields: [ordenRecurrenteId], references: [id])
+  // Lo que se ha pedido, por categoría: [{ "tipo": "PANTALLA", "cantidad": 24 }, ...].
+  // No se eligen piezas concretas al crear el envío — esas se van enlazando
+  // una a una según se escanean en origen (ver EnvioItem), así queda registro
+  // exacto de qué unidad física se mandó y luego se comprueba contra lo que
+  // se escanea en destino.
+  pedido        String
   notas         String?
   creadoPorId   String?
   creadoPor     User?     @relation("EnvioCreadoPor", fields: [creadoPorId], references: [id])

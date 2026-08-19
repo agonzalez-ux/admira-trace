@@ -58,7 +58,7 @@ export const FRECUENCIAS_RECURRENTES = [
   { dias: 90, label: "Cada 3 meses" },
 ] as const;
 
-export const TIPOS_ENVIO = ["ENVIO", "RECOGIDA"] as const;
+export const TIPOS_ENVIO = ["ENVIO", "RECOGIDA", "TRANSFERENCIA"] as const;
 export type TipoEnvio = (typeof TIPOS_ENVIO)[number];
 
 export const TRANSPORTISTAS = ["MARESA", "RENUS", "OTRO"] as const;
@@ -73,9 +73,12 @@ export const ESTADOS_ENVIO = [
 ] as const;
 export type EstadoEnvio = (typeof ESTADOS_ENVIO)[number];
 
+// Ojo: "Pendiente de preparación" ya no lleva fijo "(FDM)" — puede ser
+// cualquiera de los dos almacenes, o ninguno si es una recogida. El almacén
+// concreto se muestra aparte, junto al origen/destino de cada movimiento.
 export const ESTADO_ENVIO_LABELS: Record<EstadoEnvio, string> = {
-  PENDIENTE_PREPARACION: "Pendiente de preparación (FDM)",
-  ENVIADO: "Enviado por FDM",
+  PENDIENTE_PREPARACION: "Pendiente de preparación",
+  ENVIADO: "Enviado",
   EN_TRANSITO: "En tránsito",
   RECIBIDO: "Recibido",
   INCIDENCIA: "Incidencia en envío",

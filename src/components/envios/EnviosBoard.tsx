@@ -7,6 +7,7 @@ import {
   TIPO_MATERIAL_LABELS,
   EstadoEnvio,
 } from "@/lib/constants";
+import { parsePedido, etiquetaPedido, etiquetaTipoMovimiento, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
 
 type Material = {
   id: string;
@@ -24,16 +25,17 @@ type EnvioItem = {
 
 type Envio = {
   id: string;
-  tipo: "ENVIO" | "RECOGIDA";
+  tipo: "ENVIO" | "RECOGIDA" | "TRANSFERENCIA";
   transportista: string;
   origen: string;
   destino: string;
   almacen: "FDM" | "ADMIRA";
+  pedido: string;
   estado: EstadoEnvio;
   esRecurrente: boolean;
   notas: string | null;
   fechaCreacion: string;
-  tecnico: { id: string; name: string; zona: string | null };
+  tecnico: { id: string; name: string; zona: string | null } | null;
   creadoPor?: { name: string };
   items: EnvioItem[];
 };
@@ -53,6 +55,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
   const [feedback, setFeedback] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [vista, setVista] = useState<"PENDIENTES" | "COMPLETADOS">("PENDIENTES");
   const [busqueda, setBusqueda] = useState("");
+  const [finalizando, setFinalizando] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,15 +69,15 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
     load();
   }, [load]);
 
+  // Quién tiene que escanear ahora mismo, y en qué lado — mismo criterio que
+  // usa el backend para autorizar (ver src/lib/envioLabel.ts), más el propio
+  // estado del envío: en origen solo mientras está pendiente de preparación,
+  // en destino solo una vez que ya salió.
   function sideForRole(envio: Envio): "origen" | "destino" | null {
-    // El lado "almacén" es FDM o Admira según con qué almacén se creó el
-    // envío — no siempre FDM, desde que Admira también puede enviar/recibir
-    // material directamente con los técnicos.
-    const origenRol = envio.tipo === "ENVIO" ? envio.almacen : "TECNICO";
-    const destinoRol = envio.tipo === "ENVIO" ? "TECNICO" : envio.almacen;
-    if (role === origenRol && !envio.items.every((i) => i.escaneadoOrigen)) return "origen";
-    if (role === destinoRol && envio.items.every((i) => i.escaneadoOrigen) && !envio.items.every((i) => i.escaneadoDestino))
-      return "destino";
+    const origenRol = origenRolFor(envio);
+    const destinoRol = destinoRolFor(envio);
+    if (role === origenRol && envio.estado === "PENDIENTE_PREPARACION") return "origen";
+    if (role === destinoRol && envio.estado === "EN_TRANSITO") return "destino";
     return null;
   }
 
@@ -93,10 +96,28 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
     setFeedback({ type: "ok", text: `Material ${data.material?.nombre || code} confirmado.` });
     await load();
     const updated = data.envio as Envio;
-    setScanTarget(updated.items.every((i) => i.escaneadoOrigen && i.escaneadoDestino) ? null : updated);
+    setScanTarget(sideForRole(updated) ? updated : null);
   }
 
-  const completado = (e: Envio) => e.estado === "RECIBIDO";
+  async function finalizarConLoEscaneado(envio: Envio) {
+    setFinalizando(envio.id);
+    setFeedback(null);
+    const res = await fetch(`/api/envios/${envio.id}/finalizar`, { method: "POST" });
+    const data = await res.json();
+    setFinalizando(null);
+    if (!res.ok) {
+      setFeedback({ type: "error", text: data.error || "Error al cerrar el movimiento." });
+      return;
+    }
+    setFeedback({
+      type: "error",
+      text: "Movimiento cerrado con lo escaneado — se ha avisado a Admira de la diferencia para que lo revise.",
+    });
+    setScanTarget(null);
+    await load();
+  }
+
+  const completado = (e: Envio) => e.estado === "RECIBIDO" || e.estado === "INCIDENCIA";
   const pendientes = envios.filter((e) => !completado(e));
   const completados = envios.filter(completado);
 
@@ -159,21 +180,26 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
       {visibleEnvios.length === 0 && (
         <p className="text-sm text-slate-400 py-6 text-center">
           {listaBase.length === 0
-            ? `No hay envíos ${vista === "PENDIENTES" ? "pendientes" : "completados"}.`
-            : "Ningún envío coincide con la búsqueda."}
+            ? `No hay movimientos ${vista === "PENDIENTES" ? "pendientes" : "completados"}.`
+            : "Ningún movimiento coincide con la búsqueda."}
         </p>
       )}
       {visibleEnvios.map((envio) => {
         const side = sideForRole(envio);
-        const progresoOrigen = envio.items.filter((i) => i.escaneadoOrigen).length;
-        const progresoDestino = envio.items.filter((i) => i.escaneadoDestino).length;
+        const pedido = parsePedido(envio.pedido);
+        const totalPedido = pedido.reduce((s, p) => s + p.cantidad, 0);
+        const escaneadosOrigen = envio.items.length;
+        const confirmadosDestino = envio.items.filter((i) => i.escaneadoDestino).length;
+        const puedeFinalizar =
+          side === "origen" ? escaneadosOrigen > 0 : side === "destino" ? confirmadosDestino > 0 : false;
+
         return (
           <div key={envio.id} className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-slate-800">
-                    {envio.tipo === "ENVIO" ? "Envío" : "Recogida"} · {envio.transportista}
+                    {etiquetaTipoMovimiento(envio)} · {envio.transportista}
                   </span>
                   {envio.esRecurrente && (
                     <span className="text-[10px] bg-purple-100 text-purple-700 rounded-full px-2 py-0.5">
@@ -185,43 +211,62 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  {envio.origen} → {envio.destino} · Técnico: {envio.tecnico?.name}
-                  {envio.tecnico?.zona ? ` (${envio.tecnico.zona})` : ""}
+                  {envio.origen} → {envio.destino}
+                  {envio.tecnico && ` · Técnico: ${envio.tecnico.name}${envio.tecnico.zona ? ` (${envio.tecnico.zona})` : ""}`}
                 </div>
+                <div className="text-xs text-slate-600 mt-1">Pedido: {etiquetaPedido(pedido)}</div>
                 {envio.notas && <div className="text-xs text-slate-400 mt-1 italic">{envio.notas}</div>}
               </div>
-              {side && (
-                <button
-                  onClick={() => setScanTarget(envio)}
-                  className="shrink-0 bg-admira-600 text-white text-xs font-medium rounded-lg px-3 py-2 whitespace-nowrap"
-                >
-                  📷 Escanear
-                </button>
-              )}
+              <div className="flex flex-col gap-1.5 shrink-0 items-end">
+                {side && (
+                  <button
+                    onClick={() => setScanTarget(envio)}
+                    className="bg-admira-600 text-white text-xs font-medium rounded-lg px-3 py-2 whitespace-nowrap"
+                  >
+                    📷 Escanear
+                  </button>
+                )}
+                {side && puedeFinalizar && (
+                  <button
+                    onClick={() => finalizarConLoEscaneado(envio)}
+                    disabled={finalizando === envio.id}
+                    className="text-[11px] text-amber-700 hover:underline disabled:opacity-60 whitespace-nowrap"
+                    title="Da por cerrado este lado aunque falte algo por escanear — avisa a Admira de la diferencia"
+                  >
+                    {finalizando === envio.id ? "Cerrando…" : "Cerrar con lo escaneado"}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="mt-3 space-y-1">
-              {envio.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-2 py-1.5">
-                  <div>
-                    <span className="font-mono text-slate-600">{item.material.numeroSerie}</span>{" "}
-                    <span className="text-slate-500">
-                      · {TIPO_MATERIAL_LABELS[item.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || item.material.tipo} ·{" "}
-                      {item.material.nombre}
-                    </span>
+
+            {envio.items.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {envio.items.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-2 py-1.5">
+                    <div className="min-w-0 truncate">
+                      <span className="font-mono text-slate-600">{item.material.numeroSerie}</span>{" "}
+                      <span className="text-slate-500">
+                        · {TIPO_MATERIAL_LABELS[item.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || item.material.tipo} ·{" "}
+                        {item.material.nombre}
+                      </span>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <span className={`rounded-full px-2 py-0.5 ${item.escaneadoOrigen ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-500"}`}>
+                        Origen {item.escaneadoOrigen ? "✓" : "…"}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 ${item.escaneadoDestino ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
+                        Destino {item.escaneadoDestino ? "✓" : "…"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <span className={`rounded-full px-2 py-0.5 ${item.escaneadoOrigen ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-500"}`}>
-                      Origen {item.escaneadoOrigen ? "✓" : "…"}
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 ${item.escaneadoDestino ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}>
-                      Destino {item.escaneadoDestino ? "✓" : "…"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+
             <div className="text-[11px] text-slate-400 mt-2">
-              Origen: {progresoOrigen}/{envio.items.length} · Destino: {progresoDestino}/{envio.items.length}
+              {envio.estado === "PENDIENTE_PREPARACION"
+                ? `Escaneado en origen: ${escaneadosOrigen}/${totalPedido}`
+                : `Enviado: ${escaneadosOrigen} · Confirmado en destino: ${confirmadosDestino}/${escaneadosOrigen}`}
             </div>
           </div>
         );

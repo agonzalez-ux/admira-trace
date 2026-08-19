@@ -1,24 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { TIPO_MATERIAL_LABELS, TRANSPORTISTAS, FRECUENCIAS_RECURRENTES } from "@/lib/constants";
+import { TIPO_MATERIAL_LABELS, TIPOS_MATERIAL, TRANSPORTISTAS, FRECUENCIAS_RECURRENTES } from "@/lib/constants";
+import { TIPOS_MOVIMIENTO, type TipoMovimientoId } from "@/lib/envioLabel";
 import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 
 type Tecnico = { id: string; name: string; zona: string | null };
-type Material = { id: string; numeroSerie: string; tipo: string; nombre: string; estado: string; tecnicoId: string | null };
+type Material = { id: string; tipo: string };
 
 export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }) {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
-  const [materiales, setMateriales] = useState<Material[]>([]);
-  const [tipo, setTipo] = useState<"ENVIO" | "RECOGIDA">("ENVIO");
-  // Qué almacén es el otro lado del movimiento (además del técnico): de dónde
-  // sale el envío, o a dónde vuelve la recogida. Admira y FDM tienen cada uno
-  // su propio stock, así que hay que elegir uno — un envío no puede salir
-  // físicamente de los dos almacenes a la vez.
-  const [almacen, setAlmacen] = useState<"FDM" | "ADMIRA">("FDM");
+  const [movimiento, setMovimiento] = useState<TipoMovimientoId>("ENVIO_FDM");
   const [tecnicoId, setTecnicoId] = useState("");
   const [transportista, setTransportista] = useState<(typeof TRANSPORTISTAS)[number]>("MARESA");
-  const [selected, setSelected] = useState<string[]>([]);
+  // Pedido por categoría: cuántas unidades de cada tipo, no piezas concretas
+  // — las piezas reales se enlazan una a una cuando el almacén las escanea al
+  // preparar el envío.
+  const [cantidades, setCantidades] = useState<Record<string, number>>({});
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [frecuenciaDias, setFrecuenciaDias] = useState<number>(30);
   const [notas, setNotas] = useState("");
@@ -26,9 +24,12 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   const [ok, setOk] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Filtros del selector de material (la lista real es muy larga).
-  const [busqueda, setBusqueda] = useState("");
-  const [categoriaAbierta, setCategoriaAbierta] = useState<string | null>(null);
+  // Disponible en origen, solo como orientación (la comprobación real pasa al
+  // escanear): almacén de origen si es Envío/Transferencia, o lo que tiene
+  // encima el técnico si es Recogida.
+  const [disponibles, setDisponibles] = useState<Record<string, number>>({});
+
+  const config = TIPOS_MOVIMIENTO.find((m) => m.id === movimiento)!;
 
   useEffect(() => {
     fetch("/api/tecnicos")
@@ -37,78 +38,54 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   }, []);
 
   useEffect(() => {
-    setSelected([]);
-    setBusqueda("");
-    setCategoriaAbierta(null);
+    setCantidades({});
+    setDisponibles({});
+    setTecnicoId("");
+  }, [movimiento]);
 
-    if (tipo === "ENVIO") {
-      // El material a enviar sale de un único almacén (el elegido): un envío
-      // no puede salir a la vez del de FDM y del de Admira.
-      fetch(`/api/materiales?estado=${almacen === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM"}`)
-        .then((r) => r.json())
-        .then((d) => setMateriales(d.materiales || []));
-      return;
+  useEffect(() => {
+    async function cargarDisponibles() {
+      let url: string | null = null;
+      if (config.tipo === "RECOGIDA") {
+        url = tecnicoId ? `/api/materiales?tecnicoId=${tecnicoId}&estado=EN_TECNICO` : null;
+      } else {
+        url = `/api/materiales?estado=${config.almacen === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM"}`;
+      }
+      if (!url) {
+        setDisponibles({});
+        return;
+      }
+      const d = await fetch(url).then((r) => r.json());
+      const conteo: Record<string, number> = {};
+      for (const m of (d.materiales || []) as Material[]) conteo[m.tipo] = (conteo[m.tipo] || 0) + 1;
+      setDisponibles(conteo);
     }
+    cargarDisponibles();
+  }, [config.tipo, config.almacen, tecnicoId]);
 
-    if (!tecnicoId) {
-      setMateriales([]);
-      return;
-    }
-    fetch(`/api/materiales?tecnicoId=${tecnicoId}&estado=EN_TECNICO`)
-      .then((r) => r.json())
-      .then((d) => setMateriales(d.materiales || []));
-  }, [tipo, tecnicoId, almacen]);
-
-  const nombreAlmacen = `Almacén ${almacen === "ADMIRA" ? "Admira" : "FDM"}`;
-  const origen = tipo === "ENVIO" ? nombreAlmacen : tecnicos.find((t) => t.id === tecnicoId)?.name || "";
-  const destino = tipo === "ENVIO" ? tecnicos.find((t) => t.id === tecnicoId)?.name || "" : nombreAlmacen;
-
-  // Material agrupado por categoría, aplicando el buscador.
-  const porCategoria = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    const filtrados = q
-      ? materiales.filter((m) => m.nombre.toLowerCase().includes(q) || m.numeroSerie.toLowerCase().includes(q))
-      : materiales;
-
-    const map = new Map<string, Material[]>();
-    for (const m of filtrados) {
-      const lista = map.get(m.tipo);
-      if (lista) lista.push(m);
-      else map.set(m.tipo, [m]);
-    }
-    return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
-  }, [materiales, busqueda]);
-
-  function toggle(id: string) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  }
-
-  function toggleCategoriaCompleta(items: Material[]) {
-    const ids = items.map((m) => m.id);
-    const todosSeleccionados = ids.every((id) => selected.includes(id));
-    setSelected((s) => (todosSeleccionados ? s.filter((id) => !ids.includes(id)) : Array.from(new Set([...s, ...ids]))));
-  }
+  const pedido = useMemo(
+    () => TIPOS_MATERIAL.filter((t) => (cantidades[t] || 0) > 0).map((t) => ({ tipo: t, cantidad: cantidades[t] })),
+    [cantidades]
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setOk(null);
-    if (!tecnicoId) return setError("Selecciona un técnico.");
-    if (selected.length === 0) return setError("Selecciona al menos un material.");
+    if (config.requiereTecnico && !tecnicoId) return setError("Selecciona un técnico.");
+    if (pedido.length === 0) return setError("Indica al menos una categoría de material con cantidad.");
     setSaving(true);
 
     const res = await fetch("/api/envios", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tipo,
+        tipo: config.tipo,
+        almacen: config.almacen,
         transportista,
-        origen,
-        destino,
-        almacen,
-        tecnicoId,
-        materialIds: selected,
-        esRecurrente,
+        tecnicoId: config.requiereTecnico ? tecnicoId : undefined,
+        pedido,
+        esRecurrente: config.tipo === "ENVIO" ? esRecurrente : false,
         frecuenciaDias: esRecurrente ? frecuenciaDias : undefined,
         notas,
       }),
@@ -116,29 +93,36 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     const data = await res.json();
     setSaving(false);
     if (!res.ok) {
-      setError(data.error || "Error al crear el envío.");
+      setError(data.error || "Error al crear el movimiento.");
       return;
     }
 
     setOk(
       data.ordenRecurrente
-        ? `Envío creado y orden recurrente configurada (cada ${frecuenciaDias} días). El próximo se generará solo.`
-        : "Envío creado correctamente."
+        ? `Movimiento creado y orden recurrente configurada (cada ${frecuenciaDias} días). El próximo se generará solo.`
+        : "Movimiento creado correctamente."
     );
-    setSelected([]);
+    setCantidades({});
     setNotas("");
     onCreated();
   }
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-3">
-      <h3 className="font-semibold text-slate-800">Nuevo envío / recogida</h3>
+      <h3 className="font-semibold text-slate-800">Nuevo envío / recogida / transferencia</h3>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de movimiento</label>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value as any)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
-            <option value="ENVIO">Envío (Almacén → Técnico)</option>
-            <option value="RECOGIDA">Recogida (Técnico → Almacén)</option>
+          <select
+            value={movimiento}
+            onChange={(e) => setMovimiento(e.target.value as TipoMovimientoId)}
+            className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm"
+          >
+            {TIPOS_MOVIMIENTO.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -150,95 +134,60 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
           </select>
         </div>
       </div>
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">
-          {tipo === "ENVIO" ? "¿De qué almacén sale?" : "¿A qué almacén vuelve?"}
-        </label>
-        <select value={almacen} onChange={(e) => setAlmacen(e.target.value as any)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
-          <option value="FDM">Almacén FDM</option>
-          <option value="ADMIRA">Almacén Admira</option>
-        </select>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Técnico</label>
-        <TecnicoCombobox
-          tecnicos={tecnicos}
-          value={tecnicoId}
-          onChange={setTecnicoId}
-          placeholder="Buscar técnico por nombre o ciudad…"
-          className="text-sm"
-        />
-      </div>
-      {tecnicoId && <div className="text-xs text-slate-500">{origen} → {destino}</div>}
+
+      {config.requiereTecnico && (
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Técnico</label>
+          <TecnicoCombobox
+            tecnicos={tecnicos}
+            value={tecnicoId}
+            onChange={setTecnicoId}
+            placeholder="Buscar técnico por nombre o ciudad…"
+            className="text-sm"
+          />
+        </div>
+      )}
 
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">
-          Material disponible {tipo === "ENVIO" ? "en almacén" : "en el técnico"}
-          {selected.length > 0 && <span className="text-admira-600"> · {selected.length} seleccionado(s)</span>}
+          ¿Cuánto material, de cada tipo?
         </label>
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre o número de serie…"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm mb-2"
-        />
-        <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg divide-y">
-          {porCategoria.length === 0 && (
-            <div className="text-xs text-slate-400 p-3">
-              {materiales.length === 0 ? "No hay material disponible." : "Ningún material coincide con la búsqueda."}
-            </div>
-          )}
-          {porCategoria.map(([categoria, items]) => {
-            const abierta = categoriaAbierta === categoria || Boolean(busqueda.trim());
-            const seleccionadosEnCat = items.filter((m) => selected.includes(m.id)).length;
-            return (
-              <div key={categoria}>
-                <button
-                  type="button"
-                  onClick={() => setCategoriaAbierta(abierta && !busqueda.trim() ? null : categoria)}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 text-left"
-                >
-                  <span className="text-sm font-medium text-slate-700">
-                    {abierta ? "▾" : "▸"} {TIPO_MATERIAL_LABELS[categoria as keyof typeof TIPO_MATERIAL_LABELS] || categoria}
-                    <span className="text-xs font-normal text-slate-400"> · {items.length} disponibles</span>
-                  </span>
-                  {seleccionadosEnCat > 0 && (
-                    <span className="text-[11px] bg-admira-600 text-white rounded-full px-2 py-0.5">{seleccionadosEnCat}</span>
-                  )}
-                </button>
-                {abierta && (
-                  <div className="divide-y">
-                    <button
-                      type="button"
-                      onClick={() => toggleCategoriaCompleta(items)}
-                      className="w-full text-left px-3 py-1.5 text-[11px] text-admira-600 hover:bg-slate-50"
-                    >
-                      {items.every((m) => selected.includes(m.id)) ? "Quitar todos de esta categoría" : "Seleccionar todos de esta categoría"}
-                    </button>
-                    {items.map((m) => (
-                      <label key={m.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
-                        <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggle(m.id)} />
-                        <span className="font-mono text-xs text-slate-500">{m.numeroSerie}</span>
-                        <span className="truncate">{m.nombre}</span>
-                        {m.estado === "EN_ADMIRA" && (
-                          <span className="text-[10px] bg-admira-100 text-admira-700 rounded-full px-1.5 shrink-0">Admira</span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
+        <p className="text-[11px] text-slate-400 mb-2">
+          No hace falta elegir piezas concretas — el almacén escaneará los números de serie reales al preparar el
+          envío, y así queda registrado qué unidad exacta se manda.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {TIPOS_MATERIAL.map((t) => (
+            <div key={t} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-2 py-1.5">
+              <label className="text-xs text-slate-600 min-w-0 truncate" title={TIPO_MATERIAL_LABELS[t]}>
+                {TIPO_MATERIAL_LABELS[t]}
+                {disponibles[t] != null && (
+                  <span className="text-slate-400"> ({disponibles[t]} disp.)</span>
                 )}
-              </div>
-            );
-          })}
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={cantidades[t] || ""}
+                onChange={(e) =>
+                  setCantidades((c) => ({ ...c, [t]: Math.max(0, Number(e.target.value) || 0) }))
+                }
+                placeholder="0"
+                className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-sm text-right shrink-0"
+              />
+            </div>
+          ))}
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-slate-600">
-        <input type="checkbox" checked={esRecurrente} onChange={(e) => setEsRecurrente(e.target.checked)} />
-        Envío recurrente (técnico lejano / alta demanda)
-      </label>
+      {config.tipo === "ENVIO" && (
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input type="checkbox" checked={esRecurrente} onChange={(e) => setEsRecurrente(e.target.checked)} />
+          Envío recurrente (técnico lejano / alta demanda)
+        </label>
+      )}
 
-      {esRecurrente && (
+      {esRecurrente && config.tipo === "ENVIO" && (
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
           <label className="block text-xs font-medium text-purple-900 mb-1">¿Cada cuánto se repite el envío?</label>
           <select
@@ -251,8 +200,8 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
             ))}
           </select>
           <p className="text-[11px] text-purple-700 mt-1">
-            Se creará una orden automática: cada {frecuenciaDias} días se generará un envío con los mismos tipos y
-            cantidades de material. Podrás editarla o eliminarla desde la ficha del técnico.
+            Se creará una orden automática: cada {frecuenciaDias} días se generará un envío con el mismo pedido por
+            categorías. Podrás editarla o eliminarla desde la ficha del técnico.
           </p>
         </div>
       )}
@@ -264,7 +213,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
       {error && <p className="text-sm text-red-600">{error}</p>}
       {ok && <p className="text-sm text-emerald-600">{ok}</p>}
       <button disabled={saving} className="w-full bg-admira-600 hover:bg-admira-700 text-white font-medium rounded-lg py-2.5 disabled:opacity-60">
-        {saving ? "Creando…" : "Crear envío"}
+        {saving ? "Creando…" : "Crear movimiento"}
       </button>
     </form>
   );

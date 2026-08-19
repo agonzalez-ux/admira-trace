@@ -131,6 +131,8 @@ async function main() {
         transportista: "MARESA",
         origen: "Almacén FDM",
         destino: "Carlos Ruiz - Madrid",
+        almacen: "FDM",
+        pedido: JSON.stringify([{ tipo: "PANTALLA", cantidad: 1 }]),
         tecnicoId: tecnico.id,
         creadoPorId: admira.id,
         estado: "PENDIENTE_PREPARACION",

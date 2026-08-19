@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { calcularProximaEjecucion } from "@/lib/ordenesRecurrentes";
 import { crearNotificacion } from "@/lib/notificaciones";
+import { TIPO_MATERIAL_LABELS, TIPOS_MATERIAL } from "@/lib/constants";
+import { nombreAlmacen, almacenOpuesto, type PedidoItem } from "@/lib/envioLabel";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -28,6 +30,19 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ envios });
 }
 
+function validarPedido(pedido: unknown): PedidoItem[] | null {
+  if (!Array.isArray(pedido) || pedido.length === 0) return null;
+  const limpio: PedidoItem[] = [];
+  for (const item of pedido) {
+    const tipo = item?.tipo;
+    const cantidad = Number(item?.cantidad);
+    if (!TIPOS_MATERIAL.includes(tipo)) return null;
+    if (!Number.isInteger(cantidad) || cantidad <= 0) continue; // se ignoran las categorías a 0
+    limpio.push({ tipo, cantidad });
+  }
+  return limpio.length > 0 ? limpio : null;
+}
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || session.role !== "ADMIRA") {
@@ -35,23 +50,50 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { tipo, transportista, origen, destino, almacen, tecnicoId, materialIds, esRecurrente, frecuenciaDias, notas } =
-    body || {};
+  const { tipo, transportista, almacen, tecnicoId, pedido, esRecurrente, frecuenciaDias, notas } = body || {};
 
-  if (!tipo || !transportista || !origen || !destino || !tecnicoId || !Array.isArray(materialIds) || materialIds.length === 0) {
-    return NextResponse.json({ error: "Faltan campos obligatorios o no hay material seleccionado." }, { status: 400 });
+  if (!["ENVIO", "RECOGIDA", "TRANSFERENCIA"].includes(tipo)) {
+    return NextResponse.json({ error: "Tipo de movimiento no válido." }, { status: 400 });
+  }
+  if (!transportista) {
+    return NextResponse.json({ error: "Falta el transportista." }, { status: 400 });
   }
   if (almacen !== "FDM" && almacen !== "ADMIRA") {
-    return NextResponse.json({ error: "Indica de qué almacén sale (o a qué almacén vuelve) el material." }, { status: 400 });
+    return NextResponse.json({ error: "Indica el almacén de origen." }, { status: 400 });
   }
 
-  const tecnico = await prisma.user.findUnique({ where: { id: tecnicoId } });
-  if (!tecnico || tecnico.role !== "TECNICO") {
-    return NextResponse.json({ error: "Técnico no válido." }, { status: 400 });
+  const pedidoValidado = validarPedido(pedido);
+  if (!pedidoValidado) {
+    return NextResponse.json(
+      { error: "Indica al menos una categoría de material con cantidad mayor que 0." },
+      { status: 400 }
+    );
   }
+
+  let tecnico: { id: string; name: string } | null = null;
+  if (tipo === "TRANSFERENCIA") {
+    if (tecnicoId) {
+      return NextResponse.json({ error: "Una transferencia es entre almacenes, no lleva técnico." }, { status: 400 });
+    }
+    if (esRecurrente) {
+      return NextResponse.json({ error: "Las transferencias entre almacenes no pueden ser recurrentes." }, { status: 400 });
+    }
+  } else {
+    if (!tecnicoId) return NextResponse.json({ error: "Selecciona un técnico." }, { status: 400 });
+    const t = await prisma.user.findUnique({ where: { id: tecnicoId } });
+    if (!t || t.role !== "TECNICO") {
+      return NextResponse.json({ error: "Técnico no válido." }, { status: 400 });
+    }
+    tecnico = t;
+  }
+
+  const almacenNombre = nombreAlmacen(almacen);
+  const origen = tipo === "ENVIO" ? almacenNombre : tipo === "RECOGIDA" ? tecnico!.name : almacenNombre;
+  const destino =
+    tipo === "ENVIO" ? tecnico!.name : tipo === "RECOGIDA" ? almacenNombre : nombreAlmacen(almacenOpuesto(almacen));
 
   // Si es recurrente, se crea también la orden que generará los siguientes envíos
-  // automáticamente, con los mismos tipos y cantidades que este primer envío.
+  // automáticamente, con el mismo pedido por categorías.
   let ordenRecurrenteId: string | null = null;
   if (esRecurrente && tipo === "ENVIO") {
     const dias = Number(frecuenciaDias);
@@ -59,21 +101,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Indica cada cuántos días se repite el envío recurrente." }, { status: 400 });
     }
 
-    const seleccionados = await prisma.material.findMany({
-      where: { id: { in: materialIds } },
-      select: { tipo: true },
-    });
-    const conteo = new Map<string, number>();
-    for (const m of seleccionados) conteo.set(m.tipo, (conteo.get(m.tipo) || 0) + 1);
-    const config = Array.from(conteo.entries()).map(([t, cantidad]) => ({ tipo: t, cantidad }));
-
     const orden = await prisma.ordenRecurrente.create({
       data: {
         tecnicoId,
         frecuenciaDias: dias,
         transportista,
         almacen,
-        materialConfig: JSON.stringify(config),
+        materialConfig: JSON.stringify(pedidoValidado),
         notas: notas || null,
         creadoPorId: session.userId,
         ultimaEjecucion: new Date(),
@@ -83,6 +117,9 @@ export async function POST(req: NextRequest) {
     ordenRecurrenteId = orden.id;
   }
 
+  // Ojo: no se crea ningún EnvioItem todavía — las piezas concretas se van
+  // enlazando una a una a medida que el almacén las escanea de verdad (ver
+  // /api/envios/[id]/scan). Este pedido es solo el plan.
   const envio = await prisma.envio.create({
     data: {
       tipo,
@@ -90,29 +127,32 @@ export async function POST(req: NextRequest) {
       origen,
       destino,
       almacen,
-      tecnicoId,
+      tecnicoId: tecnicoId || null,
+      pedido: JSON.stringify(pedidoValidado),
       esRecurrente: !!esRecurrente,
       ordenRecurrenteId,
       notas: notas || null,
       creadoPorId: session.userId,
-      items: {
-        create: materialIds.map((materialId: string) => ({ materialId })),
-      },
     },
     include: { items: { include: { material: true } }, tecnico: true },
   });
 
-  await syncToSheets(["envios", "materiales"]);
+  await syncToSheets(["envios"]);
 
-  const esRecogida = envio.tipo === "RECOGIDA";
-  await crearNotificacion({
-    userId: tecnicoId,
-    tipo: "ENVIO_CREADO",
-    titulo: esRecogida ? "Nueva recogida programada" : "Nuevo envío en camino",
-    mensaje: `${envio.items.length} artículo(s) por ${transportista}, desde ${origen}.`,
-    entidadTipo: "envio",
-    entidadId: envio.id,
-  });
+  const resumenPedido = pedidoValidado
+    .map((p) => `${p.cantidad} ${TIPO_MATERIAL_LABELS[p.tipo as keyof typeof TIPO_MATERIAL_LABELS] || p.tipo}`)
+    .join(", ");
+
+  if (tecnicoId) {
+    await crearNotificacion({
+      userId: tecnicoId,
+      tipo: "ENVIO_CREADO",
+      titulo: tipo === "RECOGIDA" ? "Nueva recogida programada" : "Nuevo envío en camino",
+      mensaje: `${resumenPedido} por ${transportista}, desde ${origen}.`,
+      entidadTipo: "envio",
+      entidadId: envio.id,
+    });
+  }
 
   return NextResponse.json({ envio, ordenRecurrente: Boolean(ordenRecurrenteId) });
 }
