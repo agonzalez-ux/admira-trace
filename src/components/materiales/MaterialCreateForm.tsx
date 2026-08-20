@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { TIPOS_MATERIAL, TIPO_MATERIAL_LABELS, ESTADO_MATERIAL_LABELS } from "@/lib/constants";
+import { useEffect, useState } from "react";
+import { TIPOS_MATERIAL, TIPO_MATERIAL_LABELS, ESTADO_MATERIAL_LABELS, PROYECTOS, PROYECTO_LABELS, Proyecto } from "@/lib/constants";
 import SerialNumberScanner from "@/components/SerialNumberScanner";
+import { useProyecto } from "@/lib/proyectoContext";
 
 type Duplicado = {
   numeroSerie: string;
@@ -20,12 +21,17 @@ export default function MaterialCreateForm({
   onCreated: () => void;
   almacen?: "FDM" | "Admira";
 }) {
+  const { proyecto: proyectoActual } = useProyecto();
   const [numeroSerie, setNumeroSerie] = useState("");
   const [tipo, setTipo] = useState<(typeof TIPOS_MATERIAL)[number]>("PANTALLA");
   const [tipoPersonalizado, setTipoPersonalizado] = useState("");
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [imei, setImei] = useState("");
+  // Por defecto, el proyecto que se esté viendo en el portal — casi siempre
+  // es lo correcto, pero se puede cambiar si el material es de otro.
+  const [proyecto, setProyecto] = useState<Proyecto>(proyectoActual);
+  useEffect(() => setProyecto(proyectoActual), [proyectoActual]);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -106,6 +112,7 @@ export default function MaterialCreateForm({
         nombre,
         descripcion,
         imei: tipo === "ROUTER" ? imei.trim() || undefined : undefined,
+        proyecto,
       }),
     });
     const data = await res.json();
@@ -165,17 +172,30 @@ export default function MaterialCreateForm({
         </div>
       )}
 
-      <select
-        value={tipo}
-        onChange={(e) => setTipo(e.target.value as any)}
-        className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm"
-      >
-        {TIPOS_MATERIAL.map((t) => (
-          <option key={t} value={t}>
-            {TIPO_MATERIAL_LABELS[t]}
-          </option>
-        ))}
-      </select>
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value as any)}
+          className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm"
+        >
+          {TIPOS_MATERIAL.map((t) => (
+            <option key={t} value={t}>
+              {TIPO_MATERIAL_LABELS[t]}
+            </option>
+          ))}
+        </select>
+        <select
+          value={proyecto}
+          onChange={(e) => setProyecto(e.target.value as Proyecto)}
+          className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm"
+        >
+          {PROYECTOS.map((p) => (
+            <option key={p} value={p}>
+              {PROYECTO_LABELS[p]}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {tipo === "OTRO" && (
         <input

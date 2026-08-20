@@ -57,6 +57,7 @@
 import { google } from "googleapis";
 import ExcelJS from "exceljs";
 import { prisma } from "../src/lib/prisma";
+import { proyectoDesdeTextoMaterial } from "../src/lib/proyectos";
 
 const CLIENT_EMAIL = process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
 const PRIVATE_KEY = (process.env.GOOGLE_SHEETS_PRIVATE_KEY || "").split("\\n").join("\n");
@@ -109,6 +110,7 @@ type Candidato = {
   nombre: string;
   descripcion: string;
   imei: string | null;
+  proyecto: string | null;
   estado: string;
   tecnicoId: string | null;
   ubicacion: string | null;
@@ -205,7 +207,7 @@ async function main() {
     ].filter(Boolean).join(" ");
 
     if (candidatos.has(serial)) stats.duplicadosDentroHoja++;
-    candidatos.set(serial, { numeroSerie: serial, tipo, tipoPersonalizado, nombre, descripcion: notas, imei: null, estado, tecnicoId, ubicacion, origenHoja: "STOCK" });
+    candidatos.set(serial, { numeroSerie: serial, tipo, tipoPersonalizado, nombre, descripcion: notas, imei: null, proyecto: proyectoDesdeTextoMaterial(proyecto), estado, tecnicoId, ubicacion, origenHoja: "STOCK" });
     nSTOCK++;
   }
   stats.porHoja["STOCK"] = nSTOCK;
@@ -241,7 +243,7 @@ async function main() {
     ].filter(Boolean).join(" ");
 
     if (candidatos.has(serial)) stats.duplicadosDentroHoja++;
-    candidatos.set(serial, { numeroSerie: serial, tipo: "ROUTER", tipoPersonalizado: null, nombre, descripcion: notas, imei: imei || null, estado, tecnicoId, ubicacion, origenHoja: "Routers" });
+    candidatos.set(serial, { numeroSerie: serial, tipo: "ROUTER", tipoPersonalizado: null, nombre, descripcion: notas, imei: imei || null, proyecto: proyectoDesdeTextoMaterial(proyecto), estado, tecnicoId, ubicacion, origenHoja: "Routers" });
     nRouters++;
   }
   stats.porHoja["Routers"] = nRouters;
@@ -286,6 +288,7 @@ async function main() {
       nombre,
       descripcion: notas,
       imei: imei || null,
+      proyecto: proyectoDesdeTextoMaterial(proyecto),
       estado,
       tecnicoId,
       ubicacion,
@@ -333,6 +336,7 @@ async function main() {
           nombre: c.nombre,
           descripcion: c.descripcion,
           imei: c.imei,
+          proyecto: c.proyecto,
           estado: c.estado,
           tecnicoId: c.tecnicoId,
           ubicacion: c.ubicacion,

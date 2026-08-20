@@ -7,6 +7,19 @@ export const ROLE_LABELS: Record<Rol, string> = {
   FDM: "FDM",
 };
 
+// Los 5 proyectos Altadis que Admira gestiona con la misma plataforma. Ver
+// src/lib/proyectos.ts para el mapeo desde los datos del desk/Excel.
+export const PROYECTOS = ["PENINSULA", "BLU", "ANDORRA", "CANARIAS", "PORTUGAL"] as const;
+export type Proyecto = (typeof PROYECTOS)[number];
+
+export const PROYECTO_LABELS: Record<Proyecto, string> = {
+  PENINSULA: "Altadis Península",
+  BLU: "Altadis Blu",
+  ANDORRA: "Altadis Andorra",
+  CANARIAS: "Altadis Canarias",
+  PORTUGAL: "Altadis Portugal",
+};
+
 export const TIPOS_MATERIAL = [
   "PANTALLA",
   "ROUTER",

@@ -6,6 +6,7 @@ import {
   ESTADO_INCIDENCIA_LABELS,
   TIPO_MATERIAL_LABELS,
   TIPO_INCIDENCIA_LABELS,
+  PROYECTO_LABELS,
 } from "./constants";
 import { DOCUMENTOS, DocumentKey, getDocumentSpreadsheetId, getDocumentUrl } from "./documentSheets";
 import { etiquetaTipo, etiquetaOrigenIncidencia } from "./materialLabel";
@@ -171,12 +172,13 @@ async function syncMateriales() {
   await writeSheet(
     t.spreadsheetId,
     t.tab,
-    ["Número de serie", "Tipo", "Nombre", "IMEI", "Estado", "Técnico actual", "Zona", "Creado", "Actualizado"],
+    ["Número de serie", "Tipo", "Nombre", "IMEI", "Proyecto", "Estado", "Técnico actual", "Zona", "Creado", "Actualizado"],
     materiales.map((m) => [
       m.numeroSerie,
       etiquetaTipo(m),
       m.nombre,
       m.imei || "",
+      m.proyecto ? PROYECTO_LABELS[m.proyecto as keyof typeof PROYECTO_LABELS] || m.proyecto : "",
       ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado,
       m.tecnico?.name || "",
       m.tecnico?.zona || "",
@@ -235,6 +237,7 @@ const HEADER_INCIDENCIAS = [
   "Ticket desk",
   "Título",
   "Tipo",
+  "Proyecto",
   "Cliente",
   "Dirección",
   "Técnico",
@@ -251,6 +254,7 @@ function filaIncidencia(i: {
   ticketExternoId: string | null;
   titulo: string;
   tipo: string;
+  proyecto: string | null;
   cliente: string | null;
   direccion: string | null;
   tecnico: { name: string } | null;
@@ -266,6 +270,7 @@ function filaIncidencia(i: {
     i.ticketExternoId || "",
     i.titulo,
     TIPO_INCIDENCIA_LABELS[i.tipo as keyof typeof TIPO_INCIDENCIA_LABELS] || i.tipo,
+    i.proyecto ? PROYECTO_LABELS[i.proyecto as keyof typeof PROYECTO_LABELS] || i.proyecto : "",
     i.cliente || "",
     i.direccion || "",
     i.tecnico?.name || "(sin asignar)",

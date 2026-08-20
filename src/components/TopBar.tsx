@@ -4,15 +4,37 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CambiarPassword from "./CambiarPassword";
 import NotificationBell from "./NotificationBell";
+import { useProyecto } from "@/lib/proyectoContext";
+import { PROYECTOS, PROYECTO_LABELS, Proyecto } from "@/lib/constants";
+
+function SelectorProyecto() {
+  const { proyecto, setProyecto } = useProyecto();
+  return (
+    <select
+      value={proyecto}
+      onChange={(e) => setProyecto(e.target.value as Proyecto)}
+      className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-2 py-1.5 transition-colors text-white [&>option]:text-slate-800"
+      title="Cambiar de proyecto — filtra incidencias, material y técnicos"
+    >
+      {PROYECTOS.map((p) => (
+        <option key={p} value={p}>
+          {PROYECTO_LABELS[p]}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export default function TopBar({
   title,
   subtitle,
   roleColor = "bg-admira-600",
+  mostrarSelectorProyecto = false,
 }: {
   title: string;
   subtitle?: string;
   roleColor?: string;
+  mostrarSelectorProyecto?: boolean;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -39,6 +61,7 @@ export default function TopBar({
           {subtitle && <div className="text-xs text-white/80">{subtitle}</div>}
         </div>
         <div className="flex items-center gap-2">
+          {mostrarSelectorProyecto && <SelectorProyecto />}
           <NotificationBell />
           <button
             onClick={() => setAbierto(true)}

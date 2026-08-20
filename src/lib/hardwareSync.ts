@@ -104,6 +104,9 @@ export async function syncHardwareDesconectado(force = false): Promise<{ nuevas:
           origen: "HARDWARE",
           deskTicketId,
           deskProyecto: "Monitorización hardware",
+          // Esta monitorización solo cubre la red doméstica de pantallas de
+          // Altadis Península — no hay otra señal de proyecto en este origen.
+          proyecto: "PENINSULA",
           deskEstado: f.tipoIncidencia || f.estado,
           ticketExternoId: deskTicketId,
           titulo: `Pantalla desconectada · ${f.nombreDescriptivo || f.idEstanco}`,

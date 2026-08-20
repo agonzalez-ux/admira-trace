@@ -3,6 +3,7 @@ import { DESK_ALTADIS_PROJECTS } from "./deskConfig";
 import { syncToSheets } from "./googleSheets";
 import { matchEstanco } from "./estancoMatch";
 import { notificarEquipoAdmira } from "./notificaciones";
+import { proyectoDesdeDesk } from "./proyectos";
 
 const DESK_API_BASE = process.env.DESK_API_BASE_URL || "http://api.desk.admira.com/api";
 const DESK_API_TOKEN = process.env.DESK_API_TOKEN;
@@ -216,6 +217,7 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
               origen: "DESK",
               deskTicketId,
               deskProyecto: t.project,
+              proyecto: proyectoDesdeDesk(t.project),
               deskEstado: t.state_name,
               ticketExternoId: deskTicketId,
               titulo: t.subject || t.ticketName,
@@ -239,7 +241,8 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
           // vuelve a tocar automáticamente para no interferir con el técnico.
           const cambioEstado = existente.deskEstado !== t.state_name;
           const necesitaReintentoEstanco = !existente.estancoId;
-          if (!cambioEstado && !necesitaReintentoEstanco) continue;
+          const necesitaProyecto = !existente.proyecto;
+          if (!cambioEstado && !necesitaReintentoEstanco && !necesitaProyecto) continue;
 
           const match = necesitaReintentoEstanco ? await matchEstanco(t.ticketName || t.subject || "") : null;
           await prisma.incidencia.update({
@@ -247,6 +250,7 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
             data: {
               deskEstado: t.state_name,
               descripcion: descripcionPartes.join(" · "),
+              ...(necesitaProyecto ? { proyecto: proyectoDesdeDesk(t.project) } : {}),
               ...(match ? { estancoId: match.estancoId, estancoMatchConfianza: match.confianza } : {}),
             },
           });

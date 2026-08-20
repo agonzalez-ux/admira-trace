@@ -141,6 +141,10 @@ model Material {
   // Solo tiene sentido para routers (tipo "PC" u otros no lo usan). Es un dato
   // fijo de la propia unidad, no cambia con envíos/instalaciones.
   imei         String?
+  // PENINSULA | BLU | ANDORRA | CANARIAS | PORTUGAL (ver src/lib/constants.ts).
+  // Nullable solo por el material histórico importado sin etiqueta clara;
+  // el material nuevo siempre lo lleva.
+  proyecto     String?
   estado       String   @default("EN_FDM")
   tecnicoId    String?
   tecnico      User?    @relation("MaterialTecnico", fields: [tecnicoId], references: [id])
@@ -230,6 +234,11 @@ model Incidencia {
   deskTicketId    String?   @unique
   deskProyecto    String?
   deskEstado      String?
+  // PENINSULA | BLU | ANDORRA | CANARIAS | PORTUGAL (ver src/lib/constants.ts
+  // y proyectoDesdeDesk() en src/lib/proyectos.ts). Se calcula a partir de
+  // deskProyecto al importar el ticket; nullable por incidencias antiguas o
+  // de origen desconocido.
+  proyecto        String?
   titulo          String
   descripcion     String?
   tipo            String    @default("REPARACION")

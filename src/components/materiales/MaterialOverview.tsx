@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { TIPO_MATERIAL_LABELS, ESTADO_MATERIAL_LABELS } from "@/lib/constants";
 import { etiquetaTipo } from "@/lib/materialLabel";
+import { useProyecto } from "@/lib/proyectoContext";
 
 type Material = {
   id: string;
@@ -109,6 +110,7 @@ function MaterialCard({ m }: { m: Material }) {
 }
 
 export default function MaterialOverview() {
+  const { proyecto, activo } = useProyecto();
   const [materiales, setMateriales] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
@@ -116,13 +118,18 @@ export default function MaterialOverview() {
   const [tipoPorTecnico, setTipoPorTecnico] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
-    fetch("/api/materiales")
+    setLoading(true);
+    // El filtro por proyecto solo se aplica dentro del portal Admira (activo
+    // = hay <ProyectoProvider>); en FDM se sigue viendo todo el material sin
+    // distinción de proyecto, como siempre.
+    const url = activo ? `/api/materiales?proyecto=${proyecto}` : "/api/materiales";
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         setMateriales(d.materiales || []);
         setLoading(false);
       });
-  }, []);
+  }, [activo, proyecto]);
 
   const baseFiltered =
     filtro === "TODOS"

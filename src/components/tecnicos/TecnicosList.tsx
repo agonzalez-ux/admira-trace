@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import TecnicoFichaModal from "./TecnicoFichaModal";
+import { useProyecto } from "@/lib/proyectoContext";
+import { PROYECTO_LABELS } from "@/lib/constants";
 
 type Tecnico = {
   id: string;
@@ -18,20 +20,25 @@ type Tecnico = {
 };
 
 export default function TecnicosList() {
+  const { proyecto, activo } = useProyecto();
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [direccionRef, setDireccionRef] = useState("");
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const [sinActividadEnProyecto, setSinActividadEnProyecto] = useState(false);
 
   useEffect(() => {
-    fetch("/api/tecnicos")
+    setLoading(true);
+    const url = activo ? `/api/tecnicos?proyecto=${proyecto}` : "/api/tecnicos";
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         setTecnicos(d.tecnicos || []);
+        setSinActividadEnProyecto(Boolean(d.sinActividadEnProyecto));
         setLoading(false);
       });
-  }, []);
+  }, [activo, proyecto]);
 
   const visibles = useMemo(() => {
     let lista = tecnicos;
@@ -65,6 +72,11 @@ export default function TecnicosList() {
 
   return (
     <div>
+      {activo && sinActividadEnProyecto && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+          Ningún técnico tiene actividad todavía en {PROYECTO_LABELS[proyecto]} — mostrando el listado completo.
+        </p>
+      )}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-3 space-y-3">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Buscar técnico por nombre</label>

@@ -10,6 +10,7 @@ import {
   TIPO_INCIDENCIA_LABELS,
   TIPO_MATERIAL_LABELS,
 } from "@/lib/constants";
+import { useProyecto } from "@/lib/proyectoContext";
 
 type Foto = { id: string; url: string; fecha: string };
 type MaterialUsado = { id: string; material: { numeroSerie: string; nombre: string; tipo: string } };
@@ -366,12 +367,16 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
   const [ultimaSync, setUltimaSync] = useState<UltimaSincronizacion>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  const { proyecto, activo } = useProyecto();
+
   const load = useCallback(async () => {
-    const res = await fetch("/api/incidencias");
+    // El selector de proyecto solo existe en el portal Admira.
+    const url = role === "ADMIRA" && activo ? `/api/incidencias?proyecto=${proyecto}` : "/api/incidencias";
+    const res = await fetch(url);
     const data = await res.json();
     setIncidencias(data.incidencias || []);
     setLoading(false);
-  }, []);
+  }, [role, activo, proyecto]);
 
   const cargarEstadoSync = useCallback(async () => {
     if (role !== "ADMIRA") return;

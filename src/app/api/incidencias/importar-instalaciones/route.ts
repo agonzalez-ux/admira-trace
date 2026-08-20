@@ -96,6 +96,9 @@ export async function POST(req: NextRequest) {
             data: {
               ticketExternoId: fila.sr,
               origen: "MANUAL",
+              // Este Excel de instalaciones semanales es siempre de Altadis
+              // Península — no hay otra señal de proyecto en este origen.
+              proyecto: "PENINSULA",
               tipo: "INSTALACION_NUEVA",
               cliente: fila.expendeduria,
               titulo: `Instalar ${fila.mobiliario}`,

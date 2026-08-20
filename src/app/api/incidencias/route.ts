@@ -6,8 +6,9 @@ import { syncDeskTickets } from "@/lib/desk";
 import { crearNotificacion } from "@/lib/notificaciones";
 import { syncHardwareDesconectado } from "@/lib/hardwareSync";
 import { matchEstanco } from "@/lib/estancoMatch";
+import { esProyectoValido } from "@/lib/proyectos";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   // El scheduler (órdenes recurrentes + sincronización periódica del desk)
   // ya se arranca dentro de getSession() — se llama ahí porque cubre
   // cualquier petición autenticada de la app, no solo esta ruta.
@@ -36,10 +37,16 @@ export async function GET() {
 
   const where: any = {};
   // Los técnicos solo ven sus propias incidencias activas: las resueltas no
-  // les aportan nada en el día a día y solo añaden ruido a la lista.
+  // les aportan nada en el día a día y solo añaden ruido a la lista. No se
+  // filtran por proyecto — un técnico puede atender tickets de varios.
   if (session.role === "TECNICO") {
     where.tecnicoId = session.userId;
     where.estado = { not: "RESUELTA" };
+  } else {
+    // Selector de proyecto del portal Admira/FDM: filtra la vista entera a
+    // uno de los 5 proyectos Altadis. Solo se aplica si viene informado.
+    const proyecto = new URL(req.url).searchParams.get("proyecto");
+    if (esProyectoValido(proyecto)) where.proyecto = proyecto;
   }
 
   const incidencias = await prisma.incidencia.findMany({
@@ -64,10 +71,13 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { ticketExternoId, titulo, descripcion, tipo, cliente, direccion, tecnicoId } = body || {};
+  const { ticketExternoId, titulo, descripcion, tipo, cliente, direccion, tecnicoId, proyecto } = body || {};
 
   if (!titulo || !tipo || !tecnicoId) {
     return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
+  }
+  if (!esProyectoValido(proyecto)) {
+    return NextResponse.json({ error: "Indica a qué proyecto pertenece la incidencia." }, { status: 400 });
   }
 
   const tecnico = await prisma.user.findUnique({ where: { id: tecnicoId } });
@@ -86,6 +96,7 @@ export async function POST(req: NextRequest) {
       cliente: cliente || null,
       direccion: direccion || null,
       tecnicoId,
+      proyecto,
       estado: "ASIGNADA",
       fechaAsignacion: new Date(),
       creadoPorId: session.userId,

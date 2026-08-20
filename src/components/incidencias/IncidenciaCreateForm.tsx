@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TIPO_INCIDENCIA_LABELS, TIPOS_INCIDENCIA } from "@/lib/constants";
+import { TIPO_INCIDENCIA_LABELS, TIPOS_INCIDENCIA, PROYECTOS, PROYECTO_LABELS, Proyecto } from "@/lib/constants";
 import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
+import { useProyecto } from "@/lib/proyectoContext";
 
 type Tecnico = { id: string; name: string; zona: string | null };
 
 export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => void }) {
+  const { proyecto: proyectoActual } = useProyecto();
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [ticketExternoId, setTicketExternoId] = useState("");
   const [titulo, setTitulo] = useState("");
@@ -15,9 +17,12 @@ export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => v
   const [cliente, setCliente] = useState("");
   const [direccion, setDireccion] = useState("");
   const [tecnicoId, setTecnicoId] = useState("");
+  const [proyecto, setProyecto] = useState<Proyecto>(proyectoActual);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => setProyecto(proyectoActual), [proyectoActual]);
 
   useEffect(() => {
     fetch("/api/tecnicos")
@@ -34,7 +39,7 @@ export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => v
     const res = await fetch("/api/incidencias", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticketExternoId, titulo, descripcion, tipo, cliente, direccion, tecnicoId }),
+      body: JSON.stringify({ ticketExternoId, titulo, descripcion, tipo, cliente, direccion, tecnicoId, proyecto }),
     });
     const data = await res.json();
     setSaving(false);
@@ -61,6 +66,14 @@ export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => v
           <select value={tipo} onChange={(e) => setTipo(e.target.value as any)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
             {TIPOS_INCIDENCIA.map((t) => (
               <option key={t} value={t}>{TIPO_INCIDENCIA_LABELS[t]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Proyecto</label>
+          <select value={proyecto} onChange={(e) => setProyecto(e.target.value as Proyecto)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
+            {PROYECTOS.map((p) => (
+              <option key={p} value={p}>{PROYECTO_LABELS[p]}</option>
             ))}
           </select>
         </div>
