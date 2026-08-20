@@ -17,6 +17,9 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   // — las piezas reales se enlazan una a una cuando el almacén las escanea al
   // preparar el envío.
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
+  // Solo se usa (y hace falta) cuando la categoría "Otro" tiene cantidad > 0:
+  // qué es exactamente lo que hay que preparar (ej. "tablet", "regleta").
+  const [otroDescripcion, setOtroDescripcion] = useState("");
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [frecuenciaDias, setFrecuenciaDias] = useState<number>(30);
   const [notas, setNotas] = useState("");
@@ -39,6 +42,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
 
   useEffect(() => {
     setCantidades({});
+    setOtroDescripcion("");
     setDisponibles({});
     setTecnicoId("");
   }, [movimiento]);
@@ -64,8 +68,13 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   }, [config.tipo, config.almacen, tecnicoId]);
 
   const pedido = useMemo(
-    () => TIPOS_MATERIAL.filter((t) => (cantidades[t] || 0) > 0).map((t) => ({ tipo: t, cantidad: cantidades[t] })),
-    [cantidades]
+    () =>
+      TIPOS_MATERIAL.filter((t) => (cantidades[t] || 0) > 0).map((t) =>
+        t === "OTRO"
+          ? { tipo: t, cantidad: cantidades[t], descripcion: otroDescripcion.trim() }
+          : { tipo: t, cantidad: cantidades[t] }
+      ),
+    [cantidades, otroDescripcion]
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -74,6 +83,9 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     setOk(null);
     if (config.requiereTecnico && !tecnicoId) return setError("Selecciona un técnico.");
     if (pedido.length === 0) return setError("Indica al menos una categoría de material con cantidad.");
+    if ((cantidades["OTRO"] || 0) > 0 && !otroDescripcion.trim()) {
+      return setError('Indica a mano qué material es exactamente en la categoría "Otro".');
+    }
     setSaving(true);
 
     const res = await fetch("/api/envios", {
@@ -103,6 +115,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
         : "Movimiento creado correctamente."
     );
     setCantidades({});
+    setOtroDescripcion("");
     setNotas("");
     onCreated();
   }
@@ -178,6 +191,16 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
             </div>
           ))}
         </div>
+
+        {(cantidades["OTRO"] || 0) > 0 && (
+          <input
+            value={otroDescripcion}
+            onChange={(e) => setOtroDescripcion(e.target.value)}
+            placeholder='¿Qué es exactamente? (ej. "tablet", "regleta"...)'
+            className="w-full mt-2 rounded-lg border border-admira-300 bg-admira-50 px-3 py-2 text-sm"
+            autoFocus
+          />
+        )}
       </div>
 
       {config.tipo === "ENVIO" && (

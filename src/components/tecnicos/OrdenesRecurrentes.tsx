@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FRECUENCIAS_RECURRENTES, TIPO_MATERIAL_LABELS, TIPOS_MATERIAL, TRANSPORTISTAS } from "@/lib/constants";
+import { parsePedido, etiquetaPedido, type PedidoItem } from "@/lib/envioLabel";
 
 export type OrdenRecurrente = {
   id: string;
@@ -15,15 +16,6 @@ export type OrdenRecurrente = {
   envios: { id: string }[];
 };
 
-function parseConfig(json: string): { tipo: string; cantidad: number }[] {
-  try {
-    const p = JSON.parse(json);
-    return Array.isArray(p) ? p : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function OrdenesRecurrentes({
   ordenes,
   onCambio,
@@ -34,7 +26,9 @@ export default function OrdenesRecurrentes({
   const [editando, setEditando] = useState<string | null>(null);
   const [frecuencia, setFrecuencia] = useState(30);
   const [transportista, setTransportista] = useState<string>("MARESA");
-  const [config, setConfig] = useState<{ tipo: string; cantidad: number }[]>([]);
+  const [config, setConfig] = useState<PedidoItem[]>([]);
+  // Solo se usa (y hace falta) cuando la categoría "Otro" tiene cantidad > 0.
+  const [otroDescripcion, setOtroDescripcion] = useState("");
   const [notas, setNotas] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [feedback, setFeedback] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
@@ -43,7 +37,9 @@ export default function OrdenesRecurrentes({
     setEditando(o.id);
     setFrecuencia(o.frecuenciaDias);
     setTransportista(o.transportista);
-    setConfig(parseConfig(o.materialConfig));
+    const items = parsePedido(o.materialConfig);
+    setConfig(items);
+    setOtroDescripcion(items.find((i) => i.tipo === "OTRO")?.descripcion || "");
     setNotas(o.notas || "");
     setFeedback(null);
   }
@@ -51,10 +47,13 @@ export default function OrdenesRecurrentes({
   async function guardar(id: string) {
     setGuardando(true);
     setFeedback(null);
+    const materialConfig = config.map((i) =>
+      i.tipo === "OTRO" ? { ...i, descripcion: otroDescripcion.trim() } : i
+    );
     const res = await fetch(`/api/ordenes-recurrentes/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ frecuenciaDias: frecuencia, transportista, materialConfig: config, notas }),
+      body: JSON.stringify({ frecuenciaDias: frecuencia, transportista, materialConfig, notas }),
     });
     const data = await res.json();
     setGuardando(false);
@@ -113,7 +112,7 @@ export default function OrdenesRecurrentes({
         <p className={`text-xs ${feedback.tipo === "ok" ? "text-emerald-600" : "text-red-600"}`}>{feedback.texto}</p>
       )}
       {ordenes.map((o) => {
-        const items = parseConfig(o.materialConfig);
+        const items = parsePedido(o.materialConfig);
         const enEdicion = editando === o.id;
         return (
           <div key={o.id} className={`rounded-xl p-3 border ${o.activa ? "bg-purple-50 border-purple-200" : "bg-slate-50 border-slate-200"}`}>
@@ -125,9 +124,7 @@ export default function OrdenesRecurrentes({
                       Cada {o.frecuenciaDias} días · {o.transportista}
                       {!o.activa && <span className="text-[10px] bg-slate-300 text-slate-700 rounded-full px-2 py-0.5 ml-2">Pausada</span>}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {items.map((i) => `${i.cantidad}× ${TIPO_MATERIAL_LABELS[i.tipo as keyof typeof TIPO_MATERIAL_LABELS] || i.tipo}`).join(" · ")}
-                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{etiquetaPedido(items)}</div>
                     <div className="text-[11px] text-slate-400 mt-0.5">
                       Próximo envío: {new Date(o.proximaEjecucion).toLocaleDateString("es-ES")}
                       {o.ultimaEjecucion && ` · Último: ${new Date(o.ultimaEjecucion).toLocaleDateString("es-ES")}`}
@@ -187,6 +184,14 @@ export default function OrdenesRecurrentes({
                       );
                     })}
                   </div>
+                  {(config.find((i) => i.tipo === "OTRO")?.cantidad || 0) > 0 && (
+                    <input
+                      value={otroDescripcion}
+                      onChange={(e) => setOtroDescripcion(e.target.value)}
+                      placeholder='¿Qué es exactamente? (ej. "tablet", "regleta"...)'
+                      className="w-full mt-1 rounded-lg border border-admira-300 bg-admira-50 px-2 py-1.5 text-xs"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600 mb-1">Notas</label>

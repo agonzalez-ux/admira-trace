@@ -1,6 +1,11 @@
-import { TIPO_MATERIAL_LABELS, TipoMaterial } from "./constants";
+import { TIPO_MATERIAL_LABELS, TIPOS_MATERIAL, TipoMaterial } from "./constants";
 
-export type PedidoItem = { tipo: string; cantidad: number };
+// `descripcion` solo se usa (y hace falta) cuando tipo es "OTRO": es lo que
+// escribió Admira a mano para que el almacén sepa qué preparar exactamente
+// (ej. "tablet", "regleta") — la pieza real que se acabe escaneando se sigue
+// dando de alta como Material con tipo OTRO y su propio tipoPersonalizado,
+// igual que siempre.
+export type PedidoItem = { tipo: string; cantidad: number; descripcion?: string };
 
 /** Parsea el JSON de `Envio.pedido` / `OrdenRecurrente.materialConfig`. Nunca lanza. */
 export function parsePedido(json: string | null | undefined): PedidoItem[] {
@@ -8,7 +13,13 @@ export function parsePedido(json: string | null | undefined): PedidoItem[] {
   try {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((i) => i && typeof i.tipo === "string" && Number(i.cantidad) > 0);
+    return parsed
+      .filter((i) => i && typeof i.tipo === "string" && Number(i.cantidad) > 0)
+      .map((i) => ({
+        tipo: i.tipo,
+        cantidad: Number(i.cantidad),
+        ...(typeof i.descripcion === "string" && i.descripcion.trim() ? { descripcion: i.descripcion.trim() } : {}),
+      }));
   } catch {
     return [];
   }
@@ -16,8 +27,46 @@ export function parsePedido(json: string | null | undefined): PedidoItem[] {
 
 export function etiquetaPedido(pedido: PedidoItem[]): string {
   return pedido
-    .map((p) => `${p.cantidad} ${TIPO_MATERIAL_LABELS[p.tipo as TipoMaterial] || p.tipo}`)
+    .map((p) => {
+      const base = `${p.cantidad} ${TIPO_MATERIAL_LABELS[p.tipo as TipoMaterial] || p.tipo}`;
+      return p.descripcion ? `${base} (${p.descripcion})` : base;
+    })
     .join(", ");
+}
+
+/**
+ * Valida y limpia un pedido por categorías tal como llega del cliente (crear
+ * envío, o editar una orden recurrente) — compartida entre ambos para que no
+ * se pueda guardar en un sitio una categoría "Otro" sin descripción y en el
+ * otro sí.
+ */
+export function validarPedido(pedido: unknown): { pedido: PedidoItem[] } | { error: string } {
+  if (!Array.isArray(pedido) || pedido.length === 0) {
+    return { error: "Indica al menos una categoría de material con cantidad mayor que 0." };
+  }
+  const limpio: PedidoItem[] = [];
+  for (const item of pedido as any[]) {
+    const tipo = item?.tipo;
+    const cantidad = Number(item?.cantidad);
+    if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo)) {
+      return { error: "Categoría de material no válida." };
+    }
+    if (!Number.isInteger(cantidad) || cantidad <= 0) continue; // se ignoran las categorías a 0
+    if (tipo === "OTRO") {
+      // Sin la descripción, "Otro" no le dice nada al almacén sobre qué preparar.
+      const descripcion = String(item?.descripcion || "").trim();
+      if (!descripcion) {
+        return { error: 'Indica a mano qué material es exactamente en la categoría "Otro".' };
+      }
+      limpio.push({ tipo, cantidad, descripcion });
+    } else {
+      limpio.push({ tipo, cantidad });
+    }
+  }
+  if (limpio.length === 0) {
+    return { error: "Indica al menos una categoría de material con cantidad mayor que 0." };
+  }
+  return { pedido: limpio };
 }
 
 /**

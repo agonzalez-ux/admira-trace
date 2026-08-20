@@ -5,7 +5,7 @@ import { syncToSheets } from "@/lib/googleSheets";
 import { crearNotificacion } from "@/lib/notificaciones";
 import { parsePedido, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
 import { cerrarOrigen } from "@/lib/envios";
-import { TIPO_MATERIAL_LABELS } from "@/lib/constants";
+import { etiquetaTipo } from "@/lib/materialLabel";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const pedidoDeTipo = pedido.find((p) => p.tipo === material.tipo);
     if (!pedidoDeTipo) {
-      const nombreTipo = TIPO_MATERIAL_LABELS[material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || material.tipo;
+      const nombreTipo = etiquetaTipo(material);
       return NextResponse.json({ error: `Este pedido no incluye ${nombreTipo}.` }, { status: 409 });
     }
     const yaEscaneadosDeTipo = envio.items.filter((i) => i.material.tipo === material.tipo).length;

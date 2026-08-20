@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { calcularProximaEjecucion } from "@/lib/ordenesRecurrentes";
+import { validarPedido } from "@/lib/envioLabel";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -28,16 +29,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (notas !== undefined) data.notas = notas || null;
   if (activa !== undefined) data.activa = Boolean(activa);
   if (materialConfig !== undefined) {
-    if (!Array.isArray(materialConfig)) {
-      return NextResponse.json({ error: "Configuración de material no válida." }, { status: 400 });
+    const resultado = validarPedido(materialConfig);
+    if ("error" in resultado) {
+      return NextResponse.json({ error: resultado.error }, { status: 400 });
     }
-    const limpio = materialConfig
-      .filter((i: any) => i?.tipo && Number(i.cantidad) > 0)
-      .map((i: any) => ({ tipo: String(i.tipo), cantidad: Number(i.cantidad) }));
-    if (limpio.length === 0) {
-      return NextResponse.json({ error: "Indica al menos un tipo de material con cantidad." }, { status: 400 });
-    }
-    data.materialConfig = JSON.stringify(limpio);
+    data.materialConfig = JSON.stringify(resultado.pedido);
   }
 
   const actualizada = await prisma.ordenRecurrente.update({

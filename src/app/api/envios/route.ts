@@ -4,8 +4,7 @@ import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { calcularProximaEjecucion } from "@/lib/ordenesRecurrentes";
 import { crearNotificacion } from "@/lib/notificaciones";
-import { TIPO_MATERIAL_LABELS, TIPOS_MATERIAL } from "@/lib/constants";
-import { nombreAlmacen, almacenOpuesto, type PedidoItem } from "@/lib/envioLabel";
+import { nombreAlmacen, almacenOpuesto, etiquetaPedido, validarPedido } from "@/lib/envioLabel";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -30,19 +29,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ envios });
 }
 
-function validarPedido(pedido: unknown): PedidoItem[] | null {
-  if (!Array.isArray(pedido) || pedido.length === 0) return null;
-  const limpio: PedidoItem[] = [];
-  for (const item of pedido) {
-    const tipo = item?.tipo;
-    const cantidad = Number(item?.cantidad);
-    if (!TIPOS_MATERIAL.includes(tipo)) return null;
-    if (!Number.isInteger(cantidad) || cantidad <= 0) continue; // se ignoran las categorías a 0
-    limpio.push({ tipo, cantidad });
-  }
-  return limpio.length > 0 ? limpio : null;
-}
-
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || session.role !== "ADMIRA") {
@@ -62,13 +48,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Indica el almacén de origen." }, { status: 400 });
   }
 
-  const pedidoValidado = validarPedido(pedido);
-  if (!pedidoValidado) {
-    return NextResponse.json(
-      { error: "Indica al menos una categoría de material con cantidad mayor que 0." },
-      { status: 400 }
-    );
+  const resultadoPedido = validarPedido(pedido);
+  if ("error" in resultadoPedido) {
+    return NextResponse.json({ error: resultadoPedido.error }, { status: 400 });
   }
+  const pedidoValidado = resultadoPedido.pedido;
 
   let tecnico: { id: string; name: string } | null = null;
   if (tipo === "TRANSFERENCIA") {
@@ -139,9 +123,7 @@ export async function POST(req: NextRequest) {
 
   await syncToSheets(["envios"]);
 
-  const resumenPedido = pedidoValidado
-    .map((p) => `${p.cantidad} ${TIPO_MATERIAL_LABELS[p.tipo as keyof typeof TIPO_MATERIAL_LABELS] || p.tipo}`)
-    .join(", ");
+  const resumenPedido = etiquetaPedido(pedidoValidado);
 
   if (tecnicoId) {
     await crearNotificacion({

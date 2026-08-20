@@ -5,6 +5,7 @@ import { syncToSheets } from "@/lib/googleSheets";
 import { parsePedido, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
 import { cerrarOrigen, avisarDiscrepancia } from "@/lib/envios";
 import { TIPO_MATERIAL_LABELS } from "@/lib/constants";
+import { etiquetaTipo } from "@/lib/materialLabel";
 
 /**
  * Da por cerrado el lado (origen o destino) de un envío/recogida/transferencia
@@ -49,13 +50,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const escaneadosPorTipo = new Map<string, number>();
     for (const i of envio.items) escaneadosPorTipo.set(i.material.tipo, (escaneadosPorTipo.get(i.material.tipo) || 0) + 1);
     const faltantes = pedido
-      .map((p) => ({ tipo: p.tipo, faltan: p.cantidad - (escaneadosPorTipo.get(p.tipo) || 0) }))
+      .map((p) => ({ tipo: p.tipo, descripcion: p.descripcion, faltan: p.cantidad - (escaneadosPorTipo.get(p.tipo) || 0) }))
       .filter((p) => p.faltan > 0)
-      .map((p) => ({
-        numeroSerie: "",
-        tipo: p.tipo,
-        nombreTipo: `${p.faltan} × ${TIPO_MATERIAL_LABELS[p.tipo as keyof typeof TIPO_MATERIAL_LABELS] || p.tipo}`,
-      }));
+      .map((p) => {
+        const base = TIPO_MATERIAL_LABELS[p.tipo as keyof typeof TIPO_MATERIAL_LABELS] || p.tipo;
+        const etiqueta = p.descripcion ? `${base} (${p.descripcion})` : base;
+        return { numeroSerie: "", tipo: p.tipo, nombreTipo: `${p.faltan} × ${etiqueta}` };
+      });
 
     await cerrarOrigen(envio.id, now);
     await avisarDiscrepancia({
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .map((i) => ({
         numeroSerie: i.material.numeroSerie,
         tipo: i.material.tipo,
-        nombreTipo: TIPO_MATERIAL_LABELS[i.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || i.material.tipo,
+        nombreTipo: etiquetaTipo(i.material),
       }));
 
     await prisma.envio.update({ where: { id: envio.id }, data: { estado: "INCIDENCIA" } });

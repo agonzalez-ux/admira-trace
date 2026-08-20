@@ -4,15 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   ESTADO_ENVIO_LABELS,
-  TIPO_MATERIAL_LABELS,
   EstadoEnvio,
 } from "@/lib/constants";
 import { parsePedido, etiquetaPedido, etiquetaTipoMovimiento, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
+import { etiquetaTipo } from "@/lib/materialLabel";
 
 type Material = {
   id: string;
   numeroSerie: string;
   tipo: string;
+  tipoPersonalizado: string | null;
   nombre: string;
 };
 
@@ -246,7 +247,7 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
                     <div className="min-w-0 truncate">
                       <span className="font-mono text-slate-600">{item.material.numeroSerie}</span>{" "}
                       <span className="text-slate-500">
-                        · {TIPO_MATERIAL_LABELS[item.material.tipo as keyof typeof TIPO_MATERIAL_LABELS] || item.material.tipo} ·{" "}
+                        · {etiquetaTipo(item.material)} ·{" "}
                         {item.material.nombre}
                       </span>
                     </div>
