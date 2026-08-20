@@ -10,6 +10,7 @@ export const ROLE_LABELS: Record<Rol, string> = {
 export const TIPOS_MATERIAL = [
   "PANTALLA",
   "ROUTER",
+  "PC",
   "REPRODUCTOR",
   "SOPORTE",
   "CABLEADO",
@@ -21,6 +22,7 @@ export type TipoMaterial = (typeof TIPOS_MATERIAL)[number];
 export const TIPO_MATERIAL_LABELS: Record<TipoMaterial, string> = {
   PANTALLA: "Pantalla",
   ROUTER: "Router",
+  PC: "PC",
   REPRODUCTOR: "Reproductor",
   SOPORTE: "Soporte / anclaje",
   CABLEADO: "Cableado",

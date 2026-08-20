@@ -24,8 +24,10 @@
  * BAJA (bajas de SIM).
  *
  * Reglas de mapeo:
- *   - tipo: STOCK.PANTALLA → PANTALLA; STOCK.PC/TABLET → OTRO (con
- *     tipoPersonalizado); Routers y STOCK BLU → ROUTER.
+ *   - tipo: STOCK.PANTALLA → PANTALLA; STOCK.PC → PC; STOCK.TABLET → OTRO
+ *     (con tipoPersonalizado); Routers → ROUTER; STOCK BLU → ROUTER, salvo
+ *     las unidades que en realidad son un PC/MiniPC coladas en esa hoja,
+ *     que también van a PC.
  *   - estado (por prioridad):
  *       1. Si *INSTALADA/Instalado = "SI" y hay estanco → INSTALADO,
  *          ubicacion = nombre del estanco.
@@ -184,7 +186,7 @@ async function main() {
     let tipo = "OTRO";
     let tipoPersonalizado: string | null = tipoRaw || "OTRO";
     if (tipoRaw === "PANTALLA") { tipo = "PANTALLA"; tipoPersonalizado = null; }
-    else if (tipoRaw === "PC") tipoPersonalizado = "PC";
+    else if (tipoRaw === "PC") { tipo = "PC"; tipoPersonalizado = null; }
     else if (tipoRaw === "TABLET") tipoPersonalizado = "Tablet";
 
     const { estado: estadoBase, tecnicoId, ubicacion, notaTecnico } = resolverEstado(tecnicoPorNombre, instalada, estanco, tecnicoRaw);
@@ -278,8 +280,8 @@ async function main() {
     if (candidatos.has(serial)) stats.duplicadosDentroHoja++;
     candidatos.set(serial, {
       numeroSerie: serial,
-      tipo: esPc ? "OTRO" : "ROUTER",
-      tipoPersonalizado: esPc ? "PC" : null,
+      tipo: esPc ? "PC" : "ROUTER",
+      tipoPersonalizado: null,
       nombre,
       descripcion: notas,
       estado,
