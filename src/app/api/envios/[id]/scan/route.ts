@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { crearNotificacion } from "@/lib/notificaciones";
-import { parsePedido, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
+import { parsePedido, origenRolFor, destinoRolFor, totalPorTipo } from "@/lib/envioLabel";
 import { cerrarOrigen } from "@/lib/envios";
 import { etiquetaTipo } from "@/lib/materialLabel";
 
@@ -72,15 +72,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Ese material ya se ha escaneado en este movimiento." }, { status: 409 });
     }
 
-    const pedidoDeTipo = pedido.find((p) => p.tipo === material.tipo);
-    if (!pedidoDeTipo) {
+    // Puede haber varias líneas del mismo tipo en el pedido (varias líneas
+    // "Otro" con descripciones distintas) — cuentan juntas contra el total.
+    const totalDeTipo = totalPorTipo(pedido).get(material.tipo);
+    if (!totalDeTipo) {
       const nombreTipo = etiquetaTipo(material);
       return NextResponse.json({ error: `Este pedido no incluye ${nombreTipo}.` }, { status: 409 });
     }
     const yaEscaneadosDeTipo = envio.items.filter((i) => i.material.tipo === material.tipo).length;
-    if (yaEscaneadosDeTipo >= pedidoDeTipo.cantidad) {
+    if (yaEscaneadosDeTipo >= totalDeTipo) {
       return NextResponse.json(
-        { error: `Ya se ha escaneado la cantidad pedida de ese tipo (${pedidoDeTipo.cantidad}).` },
+        { error: `Ya se ha escaneado la cantidad pedida de ese tipo (${totalDeTipo}).` },
         { status: 409 }
       );
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
-import { parsePedido, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
+import { parsePedido, origenRolFor, destinoRolFor, totalPorTipo } from "@/lib/envioLabel";
 import { cerrarOrigen, avisarDiscrepancia } from "@/lib/envios";
 import { TIPO_MATERIAL_LABELS } from "@/lib/constants";
 import { etiquetaTipo } from "@/lib/materialLabel";
@@ -47,14 +47,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // Lo que falta, por categoría, para avisar con detalle de qué no se pudo enviar.
+    // Puede haber varias líneas del mismo tipo (varias líneas "Otro" con
+    // descripciones distintas), así que se agrega por tipo antes de comparar.
     const escaneadosPorTipo = new Map<string, number>();
     for (const i of envio.items) escaneadosPorTipo.set(i.material.tipo, (escaneadosPorTipo.get(i.material.tipo) || 0) + 1);
-    const faltantes = pedido
-      .map((p) => ({ tipo: p.tipo, descripcion: p.descripcion, faltan: p.cantidad - (escaneadosPorTipo.get(p.tipo) || 0) }))
+    const descripcionesPorTipo = new Map<string, string[]>();
+    for (const p of pedido) {
+      if (!p.descripcion) continue;
+      const lista = descripcionesPorTipo.get(p.tipo) || [];
+      lista.push(p.descripcion);
+      descripcionesPorTipo.set(p.tipo, lista);
+    }
+    const faltantes = Array.from(totalPorTipo(pedido))
+      .map(([tipo, cantidad]) => ({ tipo, faltan: cantidad - (escaneadosPorTipo.get(tipo) || 0) }))
       .filter((p) => p.faltan > 0)
       .map((p) => {
         const base = TIPO_MATERIAL_LABELS[p.tipo as keyof typeof TIPO_MATERIAL_LABELS] || p.tipo;
-        const etiqueta = p.descripcion ? `${base} (${p.descripcion})` : base;
+        const descripciones = descripcionesPorTipo.get(p.tipo);
+        const etiqueta = descripciones?.length ? `${base} (${descripciones.join(", ")})` : base;
         return { numeroSerie: "", tipo: p.tipo, nombreTipo: `${p.faltan} × ${etiqueta}` };
       });
 

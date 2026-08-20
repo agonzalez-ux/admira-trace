@@ -25,6 +25,19 @@ export function parsePedido(json: string | null | undefined): PedidoItem[] {
   }
 }
 
+/**
+ * Suma la cantidad pedida por tipo — puede haber varias líneas del mismo
+ * tipo (típicamente varias líneas "Otro" con descripciones distintas, ej.
+ * "2 tablet" + "3 regleta"), y a efectos de cupo/escaneo cuentan juntas: al
+ * escanear no se distingue de cuál de las líneas es cada pieza concreta,
+ * solo se comprueba que no se pase del total pedido de ese tipo.
+ */
+export function totalPorTipo(pedido: PedidoItem[]): Map<string, number> {
+  const totales = new Map<string, number>();
+  for (const p of pedido) totales.set(p.tipo, (totales.get(p.tipo) || 0) + p.cantidad);
+  return totales;
+}
+
 export function etiquetaPedido(pedido: PedidoItem[]): string {
   return pedido
     .map((p) => {

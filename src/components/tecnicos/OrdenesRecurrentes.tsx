@@ -16,6 +16,13 @@ export type OrdenRecurrente = {
   envios: { id: string }[];
 };
 
+type LineaOtro = { descripcion: string; cantidad: number };
+
+// Categorías con cupo fijo (una fila cada una). "Otro" se gestiona aparte,
+// como una lista de líneas propias, porque puede haber varias distintas en
+// el mismo pedido (ej. "2 tablet" + "3 regleta").
+const CATEGORIAS_FIJAS = TIPOS_MATERIAL.filter((t) => t !== "OTRO");
+
 export default function OrdenesRecurrentes({
   ordenes,
   onCambio,
@@ -27,8 +34,7 @@ export default function OrdenesRecurrentes({
   const [frecuencia, setFrecuencia] = useState(30);
   const [transportista, setTransportista] = useState<string>("MARESA");
   const [config, setConfig] = useState<PedidoItem[]>([]);
-  // Solo se usa (y hace falta) cuando la categoría "Otro" tiene cantidad > 0.
-  const [otroDescripcion, setOtroDescripcion] = useState("");
+  const [otros, setOtros] = useState<LineaOtro[]>([]);
   const [notas, setNotas] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [feedback, setFeedback] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
@@ -38,18 +44,28 @@ export default function OrdenesRecurrentes({
     setFrecuencia(o.frecuenciaDias);
     setTransportista(o.transportista);
     const items = parsePedido(o.materialConfig);
-    setConfig(items);
-    setOtroDescripcion(items.find((i) => i.tipo === "OTRO")?.descripcion || "");
+    setConfig(items.filter((i) => i.tipo !== "OTRO"));
+    setOtros(
+      items.filter((i) => i.tipo === "OTRO").map((i) => ({ descripcion: i.descripcion || "", cantidad: i.cantidad }))
+    );
     setNotas(o.notas || "");
     setFeedback(null);
   }
 
   async function guardar(id: string) {
+    const sinDescribir = otros.filter((o) => o.cantidad > 0 && !o.descripcion.trim());
+    if (sinDescribir.length > 0) {
+      setFeedback({ tipo: "error", texto: 'Indica a mano qué material es exactamente en cada línea de "Otro" (o quítala).' });
+      return;
+    }
     setGuardando(true);
     setFeedback(null);
-    const materialConfig = config.map((i) =>
-      i.tipo === "OTRO" ? { ...i, descripcion: otroDescripcion.trim() } : i
-    );
+    const materialConfig = [
+      ...config,
+      ...otros
+        .filter((o) => o.cantidad > 0 && o.descripcion.trim())
+        .map((o) => ({ tipo: "OTRO", cantidad: o.cantidad, descripcion: o.descripcion.trim() })),
+    ];
     const res = await fetch(`/api/ordenes-recurrentes/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -95,6 +111,16 @@ export default function OrdenesRecurrentes({
       const sin = prev.filter((i) => i.tipo !== tipo);
       return cantidad > 0 ? [...sin, { tipo, cantidad }] : sin;
     });
+  }
+
+  function añadirLineaOtro() {
+    setOtros((prev) => [...prev, { descripcion: "", cantidad: 1 }]);
+  }
+  function actualizarLineaOtro(idx: number, cambios: Partial<LineaOtro>) {
+    setOtros((prev) => prev.map((o, i) => (i === idx ? { ...o, ...cambios } : o)));
+  }
+  function quitarLineaOtro(idx: number) {
+    setOtros((prev) => prev.filter((_, i) => i !== idx));
   }
 
   if (ordenes.length === 0) {
@@ -168,7 +194,7 @@ export default function OrdenesRecurrentes({
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600 mb-1">Material a reponer cada vez</label>
                   <div className="grid grid-cols-2 gap-1">
-                    {TIPOS_MATERIAL.map((tipo) => {
+                    {CATEGORIAS_FIJAS.map((tipo) => {
                       const actual = config.find((i) => i.tipo === tipo)?.cantidad || 0;
                       return (
                         <div key={tipo} className="flex items-center gap-1">
@@ -184,14 +210,34 @@ export default function OrdenesRecurrentes({
                       );
                     })}
                   </div>
-                  {(config.find((i) => i.tipo === "OTRO")?.cantidad || 0) > 0 && (
-                    <input
-                      value={otroDescripcion}
-                      onChange={(e) => setOtroDescripcion(e.target.value)}
-                      placeholder='¿Qué es exactamente? (ej. "tablet", "regleta"...)'
-                      className="w-full mt-1 rounded-lg border border-admira-300 bg-admira-50 px-2 py-1.5 text-xs"
-                    />
-                  )}
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Otro material (opcional, se pueden añadir varias líneas)</label>
+                  <div className="space-y-1">
+                    {otros.map((linea, idx) => (
+                      <div key={idx} className="flex gap-1">
+                        <input
+                          value={linea.descripcion}
+                          onChange={(e) => actualizarLineaOtro(idx, { descripcion: e.target.value })}
+                          placeholder='¿Qué es? (ej. "tablet")'
+                          className="flex-1 rounded-lg border border-admira-300 bg-admira-50 px-2 py-1.5 text-xs"
+                        />
+                        <input
+                          type="number"
+                          min={1}
+                          value={linea.cantidad}
+                          onChange={(e) => actualizarLineaOtro(idx, { cantidad: Math.max(1, Number(e.target.value) || 1) })}
+                          className="w-12 rounded-lg border border-admira-300 bg-admira-50 px-1.5 py-1.5 text-xs text-right"
+                        />
+                        <button type="button" onClick={() => quitarLineaOtro(idx)} className="text-slate-400 hover:text-red-600 px-1" title="Quitar">
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={añadirLineaOtro} className="mt-1 text-[11px] font-medium text-admira-600 hover:underline">
+                    + Añadir otro material
+                  </button>
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600 mb-1">Notas</label>

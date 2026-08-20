@@ -7,6 +7,12 @@ import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 
 type Tecnico = { id: string; name: string; zona: string | null };
 type Material = { id: string; tipo: string };
+type LineaOtro = { descripcion: string; cantidad: number };
+
+// Categorías con cupo fijo (una fila cada una). "Otro" se gestiona aparte,
+// como una lista de líneas propias, porque puede haber varias distintas en
+// el mismo pedido (ej. "2 tablet" + "3 regleta").
+const CATEGORIAS_FIJAS = TIPOS_MATERIAL.filter((t) => t !== "OTRO");
 
 export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }) {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
@@ -17,9 +23,9 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   // — las piezas reales se enlazan una a una cuando el almacén las escanea al
   // preparar el envío.
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
-  // Solo se usa (y hace falta) cuando la categoría "Otro" tiene cantidad > 0:
-  // qué es exactamente lo que hay que preparar (ej. "tablet", "regleta").
-  const [otroDescripcion, setOtroDescripcion] = useState("");
+  // Líneas sueltas de material "Otro" — cada una con su propia descripción a
+  // mano y cantidad, para poder pedir varias cosas distintas de golpe.
+  const [otros, setOtros] = useState<LineaOtro[]>([]);
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [frecuenciaDias, setFrecuenciaDias] = useState<number>(30);
   const [notas, setNotas] = useState("");
@@ -42,7 +48,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
 
   useEffect(() => {
     setCantidades({});
-    setOtroDescripcion("");
+    setOtros([]);
     setDisponibles({});
     setTecnicoId("");
   }, [movimiento]);
@@ -67,25 +73,40 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     cargarDisponibles();
   }, [config.tipo, config.almacen, tecnicoId]);
 
-  const pedido = useMemo(
-    () =>
-      TIPOS_MATERIAL.filter((t) => (cantidades[t] || 0) > 0).map((t) =>
-        t === "OTRO"
-          ? { tipo: t, cantidad: cantidades[t], descripcion: otroDescripcion.trim() }
-          : { tipo: t, cantidad: cantidades[t] }
-      ),
-    [cantidades, otroDescripcion]
-  );
+  // Líneas de "Otro" con cantidad puesta pero sin describir aún — hace falta
+  // rellenarlas antes de poder enviar.
+  const otrosSinDescribir = otros.filter((o) => o.cantidad > 0 && !o.descripcion.trim());
+
+  const pedido = useMemo(() => {
+    const fijos = CATEGORIAS_FIJAS.filter((t) => (cantidades[t] || 0) > 0).map((t) => ({
+      tipo: t,
+      cantidad: cantidades[t],
+    }));
+    const sueltos = otros
+      .filter((o) => o.cantidad > 0 && o.descripcion.trim())
+      .map((o) => ({ tipo: "OTRO", cantidad: o.cantidad, descripcion: o.descripcion.trim() }));
+    return [...fijos, ...sueltos];
+  }, [cantidades, otros]);
+
+  function añadirLineaOtro() {
+    setOtros((prev) => [...prev, { descripcion: "", cantidad: 1 }]);
+  }
+  function actualizarLineaOtro(idx: number, cambios: Partial<LineaOtro>) {
+    setOtros((prev) => prev.map((o, i) => (i === idx ? { ...o, ...cambios } : o)));
+  }
+  function quitarLineaOtro(idx: number) {
+    setOtros((prev) => prev.filter((_, i) => i !== idx));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setOk(null);
     if (config.requiereTecnico && !tecnicoId) return setError("Selecciona un técnico.");
-    if (pedido.length === 0) return setError("Indica al menos una categoría de material con cantidad.");
-    if ((cantidades["OTRO"] || 0) > 0 && !otroDescripcion.trim()) {
-      return setError('Indica a mano qué material es exactamente en la categoría "Otro".');
+    if (otrosSinDescribir.length > 0) {
+      return setError('Indica a mano qué material es exactamente en cada línea de "Otro" (o quítala si no hace falta).');
     }
+    if (pedido.length === 0) return setError("Indica al menos una categoría de material con cantidad.");
     setSaving(true);
 
     const res = await fetch("/api/envios", {
@@ -115,7 +136,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
         : "Movimiento creado correctamente."
     );
     setCantidades({});
-    setOtroDescripcion("");
+    setOtros([]);
     setNotas("");
     onCreated();
   }
@@ -170,7 +191,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
           envío, y así queda registrado qué unidad exacta se manda.
         </p>
         <div className="grid grid-cols-2 gap-2">
-          {TIPOS_MATERIAL.map((t) => (
+          {CATEGORIAS_FIJAS.map((t) => (
             <div key={t} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-2 py-1.5">
               <label className="text-xs text-slate-600 min-w-0 truncate" title={TIPO_MATERIAL_LABELS[t]}>
                 {TIPO_MATERIAL_LABELS[t]}
@@ -191,16 +212,49 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
             </div>
           ))}
         </div>
+      </div>
 
-        {(cantidades["OTRO"] || 0) > 0 && (
-          <input
-            value={otroDescripcion}
-            onChange={(e) => setOtroDescripcion(e.target.value)}
-            placeholder='¿Qué es exactamente? (ej. "tablet", "regleta"...)'
-            className="w-full mt-2 rounded-lg border border-admira-300 bg-admira-50 px-3 py-2 text-sm"
-            autoFocus
-          />
-        )}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">Otro material (opcional)</label>
+        <p className="text-[11px] text-slate-400 mb-2">
+          Puedes añadir varias líneas distintas (ej. "2 tablet" y "3 regleta") si en este movimiento hace falta más
+          de una cosa que no encaje en las categorías de arriba.
+        </p>
+        <div className="space-y-2">
+          {otros.map((o, idx) => (
+            <div key={idx} className="flex gap-2">
+              <input
+                value={o.descripcion}
+                onChange={(e) => actualizarLineaOtro(idx, { descripcion: e.target.value })}
+                placeholder='¿Qué es exactamente? (ej. "tablet", "regleta"...)'
+                className="flex-1 rounded-lg border border-admira-300 bg-admira-50 px-3 py-2 text-sm"
+                autoFocus
+              />
+              <input
+                type="number"
+                min={1}
+                value={o.cantidad}
+                onChange={(e) => actualizarLineaOtro(idx, { cantidad: Math.max(1, Number(e.target.value) || 1) })}
+                className="w-16 rounded-lg border border-admira-300 bg-admira-50 px-2 py-2 text-sm text-right shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => quitarLineaOtro(idx)}
+                className="text-slate-400 hover:text-red-600 px-1 shrink-0"
+                title="Quitar esta línea"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={añadirLineaOtro}
+          className="mt-2 text-xs font-medium text-admira-600 hover:underline"
+        >
+          + Añadir otro material
+        </button>
       </div>
 
       {config.tipo === "ENVIO" && (
