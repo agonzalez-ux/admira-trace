@@ -6,12 +6,11 @@ import { syncDeskTickets } from "@/lib/desk";
 import { crearNotificacion } from "@/lib/notificaciones";
 import { syncHardwareDesconectado } from "@/lib/hardwareSync";
 import { matchEstanco } from "@/lib/estancoMatch";
-import { iniciarScheduler } from "@/lib/scheduler";
 
 export async function GET() {
-  // Arranca (una sola vez) la comprobación periódica de órdenes recurrentes.
-  iniciarScheduler();
-
+  // El scheduler (órdenes recurrentes + sincronización periódica del desk)
+  // ya se arranca dentro de getSession() — se llama ahí porque cubre
+  // cualquier petición autenticada de la app, no solo esta ruta.
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
 

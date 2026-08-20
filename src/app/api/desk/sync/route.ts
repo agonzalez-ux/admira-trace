@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { syncDeskTickets, DESK_CONFIGURED, ampliarVentanaDeskDias, obtenerVentanaDeskDias } from "@/lib/desk";
+import {
+  syncDeskTickets,
+  DESK_CONFIGURED,
+  ampliarVentanaDeskDias,
+  obtenerVentanaDeskDias,
+  obtenerUltimoResultadoSyncDesk,
+} from "@/lib/desk";
 import { syncHardwareDesconectado, HARDWARE_SYNC_CONFIGURADO } from "@/lib/hardwareSync";
 
 export async function POST(req: NextRequest) {
@@ -56,5 +62,9 @@ export async function GET() {
   if (!session || (session.role !== "ADMIRA" && session.role !== "FDM")) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
-  return NextResponse.json({ configured: DESK_CONFIGURED, ventanaDias: obtenerVentanaDeskDias() });
+  return NextResponse.json({
+    configured: DESK_CONFIGURED,
+    ventanaDias: obtenerVentanaDeskDias(),
+    ultimaSincronizacion: obtenerUltimoResultadoSyncDesk(),
+  });
 }

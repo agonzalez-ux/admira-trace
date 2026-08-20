@@ -308,6 +308,52 @@ function ProgramarVisita({ incidenciaId, onProgramada }: { incidenciaId: string;
   );
 }
 
+type UltimaSincronizacion = {
+  fecha: string;
+  nuevas: number;
+  actualizadas: number;
+  erroresTickets: number;
+  proyectosConError: string[];
+} | null;
+
+function haceCuanto(fechaIso: string): string {
+  const minutos = Math.max(0, Math.round((Date.now() - new Date(fechaIso).getTime()) / 60000));
+  if (minutos < 1) return "hace un momento";
+  if (minutos < 60) return `hace ${minutos} min`;
+  const horas = Math.round(minutos / 60);
+  if (horas < 24) return `hace ${horas} h`;
+  return `hace ${Math.round(horas / 24)} días`;
+}
+
+/**
+ * Aviso de cuándo se sincronizó de verdad por última vez con el desk (la
+ * automática, cada 2h, o la manual) — sin esto no había forma de saber desde
+ * la app si la sincronización automática seguía funcionando o se había
+ * quedado colgada desde el último despliegue.
+ */
+function EstadoUltimaSync({ ultimaSync }: { ultimaSync: UltimaSincronizacion }) {
+  if (!ultimaSync) {
+    return <p className="text-[11px] text-slate-400">Todavía no se ha sincronizado en esta sesión del servidor.</p>;
+  }
+  const minutosDesde = (Date.now() - new Date(ultimaSync.fecha).getTime()) / 60000;
+  const conProblemas = ultimaSync.erroresTickets > 0 || ultimaSync.proyectosConError.length > 0;
+  const retrasada = minutosDesde > 180; // más de 2 sincronizaciones automáticas seguidas falladas
+  return (
+    <div className="text-right">
+      <p className={`text-[11px] ${retrasada ? "text-red-600 font-medium" : "text-slate-400"}`}>
+        Última sync: {haceCuanto(ultimaSync.fecha)} · {ultimaSync.nuevas} nuevas, {ultimaSync.actualizadas} actualizadas
+        {retrasada && " ⚠️ hace más de lo esperado"}
+      </p>
+      {conProblemas && (
+        <p className="text-[11px] text-amber-600">
+          {ultimaSync.erroresTickets > 0 && `${ultimaSync.erroresTickets} ticket(s) con error al procesar. `}
+          {ultimaSync.proyectosConError.length > 0 && `Proyectos con fallo: ${ultimaSync.proyectosConError.join(", ")}.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" }) {
   const [incidencias, setIncidencias] = useState<Incidencia[]>([]);
   const [loading, setLoading] = useState(true);
@@ -317,6 +363,7 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
   const [vista, setVista] = useState<"SIN_ASIGNAR" | "ASIGNADAS">("SIN_ASIGNAR");
   const [detalle, setDetalle] = useState<Incidencia | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [ultimaSync, setUltimaSync] = useState<UltimaSincronizacion>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = useCallback(async () => {
@@ -326,9 +373,17 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
     setLoading(false);
   }, []);
 
+  const cargarEstadoSync = useCallback(async () => {
+    if (role !== "ADMIRA") return;
+    const res = await fetch("/api/desk/sync");
+    const data = await res.json();
+    setUltimaSync(data.ultimaSincronizacion ?? null);
+  }, [role]);
+
   useEffect(() => {
     load();
-  }, [load]);
+    cargarEstadoSync();
+  }, [load, cargarEstadoSync]);
 
   async function sincronizarDesk() {
     setSincronizando(true);
@@ -356,6 +411,7 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
       setFeedback({ type: "error", text: "No se pudo completar la sincronización (tiempo de espera agotado o error de red). Inténtalo de nuevo." });
     } finally {
       setSincronizando(false);
+      cargarEstadoSync();
     }
   }
 
@@ -450,13 +506,16 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
                 Asignadas ({asignadas.length})
               </button>
             </div>
-            <button
-              onClick={sincronizarDesk}
-              disabled={sincronizando}
-              className="text-xs font-medium bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-2 disabled:opacity-60"
-            >
-              {sincronizando ? "Sincronizando…" : "🔄 Sincronizar con el desk ahora"}
-            </button>
+            <div className="flex flex-col items-end gap-0.5">
+              <button
+                onClick={sincronizarDesk}
+                disabled={sincronizando}
+                className="text-xs font-medium bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-2 disabled:opacity-60"
+              >
+                {sincronizando ? "Sincronizando…" : "🔄 Sincronizar con el desk ahora"}
+              </button>
+              <EstadoUltimaSync ultimaSync={ultimaSync} />
+            </div>
           </div>
 
           <input

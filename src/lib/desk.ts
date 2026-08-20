@@ -135,6 +135,24 @@ function requiereTecnicoInSitu(t: DeskTicket): boolean {
  * están dentro de `obtenerVentanaDeskDias()` días; los más antiguos se ignoran
  * hasta que se pulse "Mostrar más" y la ventana se amplíe.
  */
+export type ResultadoSyncDesk = {
+  fecha: Date;
+  nuevas: number;
+  actualizadas: number;
+  erroresTickets: number;
+  proyectosConError: string[];
+};
+
+// Último resultado conocido, en memoria — se pierde al reiniciar el
+// contenedor (no es grave: la siguiente sincronización lo repuebla en
+// segundos), pero mientras el proceso está vivo permite mostrar en la app
+// "hace cuánto se sincronizó de verdad" en vez de asumirlo a ciegas.
+let ultimoResultado: ResultadoSyncDesk | null = null;
+
+export function obtenerUltimoResultadoSyncDesk(): ResultadoSyncDesk | null {
+  return ultimoResultado;
+}
+
 export async function syncDeskTickets(force = false): Promise<{ nuevas: number; actualizadas: number }> {
   if (!DESK_CONFIGURED) return { nuevas: 0, actualizadas: 0 };
 
@@ -146,6 +164,8 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
 
   let nuevas = 0;
   let actualizadas = 0;
+  let erroresTickets = 0;
+  const proyectosConError: string[] = [];
   const ventanaDias = ventanaDiasActual;
 
   // Antes se pedía cada proyecto del desk uno detrás de otro, esperando a que
@@ -164,6 +184,7 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
         // Si un proyecto falla (timeout, error del desk, etc.) no debe impedir que
         // se sincronicen los demás.
         console.error(`[desk-sync] Error sincronizando el proyecto "${proyecto.name}" (id ${proyecto.id}):`, err);
+        proyectosConError.push(proyecto.name);
         return { proyecto, tickets: [] as DeskTicket[] };
       }
     })
@@ -171,59 +192,69 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
 
   for (const { tickets } of resultadosPorProyecto) {
     for (const t of tickets) {
-      const deskTicketId = String(t.id);
-      const existente = await prisma.incidencia.findUnique({ where: { deskTicketId } });
+      // Un solo ticket con datos raros (título que rompe el emparejador, una
+      // escritura que choca en la base de datos, etc.) no debe tirar abajo el
+      // resto de la pasada — antes, si esto lanzaba a mitad de una lista de
+      // cientos de tickets, todos los que venían detrás en esa pasada se
+      // quedaban sin importar/actualizar, sin ningún aviso.
+      try {
+        const deskTicketId = String(t.id);
+        const existente = await prisma.incidencia.findUnique({ where: { deskTicketId } });
 
-      const descripcionPartes = [
-        t.type_detail_name ? `Tipo: ${t.type_detail_name}` : null,
-        t.priority_name ? `Prioridad: ${t.priority_name}` : null,
-        `Estado en el desk: ${t.state_name}`,
-      ].filter(Boolean);
+        const descripcionPartes = [
+          t.type_detail_name ? `Tipo: ${t.type_detail_name}` : null,
+          t.priority_name ? `Prioridad: ${t.priority_name}` : null,
+          `Estado en el desk: ${t.state_name}`,
+        ].filter(Boolean);
 
-      if (!existente) {
-        if (!requiereTecnicoInSitu(t)) continue;
-        if (!dentroDeVentana(t.inserted, ventanaDias)) continue;
-        const match = await matchEstanco(t.ticketName || t.subject || "");
-        await prisma.incidencia.create({
-          data: {
-            origen: "DESK",
-            deskTicketId,
-            deskProyecto: t.project,
-            deskEstado: t.state_name,
-            ticketExternoId: deskTicketId,
-            titulo: t.subject || t.ticketName,
-            descripcion: descripcionPartes.join(" · "),
-            tipo: "REPARACION",
-            cliente: t.project,
-            direccion: t.ticketName,
-            estado: "SIN_ASIGNAR",
-            estancoId: match?.estancoId || null,
-            estancoMatchConfianza: match?.confianza || null,
-          },
-        });
-        nuevas += 1;
-      } else if (existente.estado === "SIN_ASIGNAR") {
-        // Mientras siga sin asignar, además de refrescar el estado del desk,
-        // reintentamos el emparejamiento con el directorio de estancos si
-        // todavía no tiene uno: el emparejador ha ido mejorando con el tiempo
-        // (títulos con formatos raros que antes no reconocía), así que un
-        // ticket que se quedó sin vincular puede engancharse en una pasada
-        // posterior sin tener que tocar nada a mano. Una vez asignada, no se
-        // vuelve a tocar automáticamente para no interferir con el técnico.
-        const cambioEstado = existente.deskEstado !== t.state_name;
-        const necesitaReintentoEstanco = !existente.estancoId;
-        if (!cambioEstado && !necesitaReintentoEstanco) continue;
+        if (!existente) {
+          if (!requiereTecnicoInSitu(t)) continue;
+          if (!dentroDeVentana(t.inserted, ventanaDias)) continue;
+          const match = await matchEstanco(t.ticketName || t.subject || "");
+          await prisma.incidencia.create({
+            data: {
+              origen: "DESK",
+              deskTicketId,
+              deskProyecto: t.project,
+              deskEstado: t.state_name,
+              ticketExternoId: deskTicketId,
+              titulo: t.subject || t.ticketName,
+              descripcion: descripcionPartes.join(" · "),
+              tipo: "REPARACION",
+              cliente: t.project,
+              direccion: t.ticketName,
+              estado: "SIN_ASIGNAR",
+              estancoId: match?.estancoId || null,
+              estancoMatchConfianza: match?.confianza || null,
+            },
+          });
+          nuevas += 1;
+        } else if (existente.estado === "SIN_ASIGNAR") {
+          // Mientras siga sin asignar, además de refrescar el estado del desk,
+          // reintentamos el emparejamiento con el directorio de estancos si
+          // todavía no tiene uno: el emparejador ha ido mejorando con el tiempo
+          // (títulos con formatos raros que antes no reconocía), así que un
+          // ticket que se quedó sin vincular puede engancharse en una pasada
+          // posterior sin tener que tocar nada a mano. Una vez asignada, no se
+          // vuelve a tocar automáticamente para no interferir con el técnico.
+          const cambioEstado = existente.deskEstado !== t.state_name;
+          const necesitaReintentoEstanco = !existente.estancoId;
+          if (!cambioEstado && !necesitaReintentoEstanco) continue;
 
-        const match = necesitaReintentoEstanco ? await matchEstanco(t.ticketName || t.subject || "") : null;
-        await prisma.incidencia.update({
-          where: { id: existente.id },
-          data: {
-            deskEstado: t.state_name,
-            descripcion: descripcionPartes.join(" · "),
-            ...(match ? { estancoId: match.estancoId, estancoMatchConfianza: match.confianza } : {}),
-          },
-        });
-        actualizadas += 1;
+          const match = necesitaReintentoEstanco ? await matchEstanco(t.ticketName || t.subject || "") : null;
+          await prisma.incidencia.update({
+            where: { id: existente.id },
+            data: {
+              deskEstado: t.state_name,
+              descripcion: descripcionPartes.join(" · "),
+              ...(match ? { estancoId: match.estancoId, estancoMatchConfianza: match.confianza } : {}),
+            },
+          });
+          actualizadas += 1;
+        }
+      } catch (err) {
+        erroresTickets += 1;
+        console.error(`[desk-sync] Error procesando el ticket #${t.id}:`, err);
       }
     }
   }
@@ -239,6 +270,8 @@ export async function syncDeskTickets(force = false): Promise<{ nuevas: number; 
       mensaje: "Requieren visita in situ y están sin técnico asignado.",
     });
   }
+
+  ultimoResultado = { fecha: new Date(), nuevas, actualizadas, erroresTickets, proyectosConError };
 
   return { nuevas, actualizadas };
 }
