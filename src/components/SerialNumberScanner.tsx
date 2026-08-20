@@ -3,15 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  onScan: (codigo: string) => void;
+  onScan: (datos: { numeroSerie: string; imei?: string }) => void;
   onClose: () => void;
+  // true para routers: además del número de serie, intenta leer también el
+  // IMEI de la misma foto (suele venir en la misma etiqueta) y muestra un
+  // segundo campo para revisarlo/corregirlo.
+  pedirImei?: boolean;
 };
 
 /**
  * Intenta encontrar el número de serie dentro del texto crudo que devuelve el OCR.
  *
  * 1) Si aparece justo después de una palabra clave típica de etiqueta (S/N, SERIE,
- *    REF, CÓDIGO...), nos quedamos con lo que sigue: es la señal más fiable.
+ *    SERIAL NUMBER, SERIAL NO., REF, CÓDIGO...), nos quedamos con lo que sigue: es
+ *    la señal más fiable.
  * 2) Si no, buscamos el token alfanumérico que más se parece a un número de serie
  *    (mezcla de letras y números) y nos quedamos con el más largo.
  *
@@ -21,8 +26,11 @@ type Props = {
 function extraerCandidato(textoCrudo: string): { valor: string; tipo: string } | null {
   const texto = textoCrudo.toUpperCase();
 
+  // "SERIAL" puede venir suelto (Shuttle: "S/N:"), o seguido de "NUMBER"/"NO."
+  // antes de los dos puntos (Philips: "SERIAL NUMBER:", LG: "SERIAL NO.:") —
+  // sin esto, la etiqueta se leía como si no hubiera palabra clave.
   const conPalabraClave = texto.match(
-    /(?:S\/?N|SERIE|SERIAL|N[ºO]\s*SERIE|REF(?:ERENCIA)?|C[OÓ]DIGO)[:\s.-]*([A-Z0-9][A-Z0-9-]{3,})/
+    /(?:S\/?N|SERIE|SERIAL\s*(?:NUMBER|NO\.?)?|N[ºO]\s*SERIE|REF(?:ERENCIA)?|C[OÓ]DIGO)[:\s.\-：]*([A-Z0-9][A-Z0-9-]{3,})/
   );
   if (conPalabraClave) {
     return { valor: conPalabraClave[1].replace(/[^A-Z0-9-]/g, ""), tipo: "serie" };
@@ -37,13 +45,20 @@ function extraerCandidato(textoCrudo: string): { valor: string; tipo: string } |
   return { valor: candidatos[0], tipo: "detectado" };
 }
 
-export default function SerialNumberScanner({ onScan, onClose }: Props) {
+/** El IMEI de un router siempre va etiquetado como tal y son 14-17 cifras. */
+function extraerImei(textoCrudo: string): string | null {
+  const m = textoCrudo.toUpperCase().match(/IMEI[:\s.\-：]*([0-9]{14,17})/);
+  return m ? m[1] : null;
+}
+
+export default function SerialNumberScanner({ onScan, onClose, pedirImei = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [estado, setEstado] = useState<"camara" | "procesando" | "resultado">("camara");
   const [error, setError] = useState<string | null>(null);
   const [numeroSerie, setNumeroSerie] = useState("");
   const [tipoNumero, setTipoNumero] = useState<string | null>(null);
+  const [imei, setImei] = useState("");
   const [textoCompleto, setTextoCompleto] = useState("");
   const [mostrarTextoCompleto, setMostrarTextoCompleto] = useState(false);
 
@@ -118,6 +133,7 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
         setNumeroSerie(candidato.valor);
         setTipoNumero(candidato.tipo);
       }
+      if (pedirImei) setImei(extraerImei(textoLimpio) || "");
       setEstado("resultado");
     } catch (err) {
       setError("Error leyendo la foto: " + (err instanceof Error ? err.message : "desconocido"));
@@ -128,7 +144,7 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
   const aceptarNumero = () => {
     const valor = numeroSerie.trim();
     if (valor) {
-      onScan(valor);
+      onScan({ numeroSerie: valor, imei: imei.trim() || undefined });
     }
   };
 
@@ -136,6 +152,7 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
     setEstado("camara");
     setNumeroSerie("");
     setTipoNumero(null);
+    setImei("");
     setTextoCompleto("");
     setMostrarTextoCompleto(false);
     setError(null);
@@ -146,7 +163,7 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
       <div className="bg-white rounded-2xl p-4 w-full max-w-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">
-            {estado === "camara" && "Capturar número de serie"}
+            {estado === "camara" && (pedirImei ? "Capturar número de serie e IMEI" : "Capturar número de serie")}
             {estado === "procesando" && "Leyendo foto..."}
             {estado === "resultado" && "Número de serie detectado"}
           </h3>
@@ -162,7 +179,9 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
               <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
               <div className="absolute inset-0 border-2 border-yellow-400 opacity-50" />
               <div className="absolute bottom-3 left-0 right-0 text-center text-white text-xs bg-black/50 py-2">
-                Encuadra el número de serie en el centro, bien enfocado
+                {pedirImei
+                  ? "Encuadra la etiqueta de forma que se vean el S/N y el IMEI a la vez, bien enfocados"
+                  : "Encuadra el número de serie en el centro, bien enfocado"}
               </div>
             </div>
 
@@ -226,6 +245,20 @@ export default function SerialNumberScanner({ onScan, onClose }: Props) {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono mb-2"
               autoFocus
             />
+
+            {pedirImei && (
+              <>
+                <label className="block text-xs text-slate-500 mb-1">
+                  IMEI (revisa y corrige si hace falta — déjalo en blanco si no se ve en la foto)
+                </label>
+                <input
+                  value={imei}
+                  onChange={(e) => setImei(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="15 dígitos, junto a la etiqueta IMEI"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono mb-2"
+                />
+              </>
+            )}
 
             {textoCompleto && (
               <button

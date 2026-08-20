@@ -171,11 +171,12 @@ async function syncMateriales() {
   await writeSheet(
     t.spreadsheetId,
     t.tab,
-    ["Número de serie", "Tipo", "Nombre", "Estado", "Técnico actual", "Zona", "Creado", "Actualizado"],
+    ["Número de serie", "Tipo", "Nombre", "IMEI", "Estado", "Técnico actual", "Zona", "Creado", "Actualizado"],
     materiales.map((m) => [
       m.numeroSerie,
       etiquetaTipo(m),
       m.nombre,
+      m.imei || "",
       ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado,
       m.tecnico?.name || "",
       m.tecnico?.zona || "",

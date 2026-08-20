@@ -108,6 +108,7 @@ type Candidato = {
   tipoPersonalizado: string | null;
   nombre: string;
   descripcion: string;
+  imei: string | null;
   estado: string;
   tecnicoId: string | null;
   ubicacion: string | null;
@@ -204,7 +205,7 @@ async function main() {
     ].filter(Boolean).join(" ");
 
     if (candidatos.has(serial)) stats.duplicadosDentroHoja++;
-    candidatos.set(serial, { numeroSerie: serial, tipo, tipoPersonalizado, nombre, descripcion: notas, estado, tecnicoId, ubicacion, origenHoja: "STOCK" });
+    candidatos.set(serial, { numeroSerie: serial, tipo, tipoPersonalizado, nombre, descripcion: notas, imei: null, estado, tecnicoId, ubicacion, origenHoja: "STOCK" });
     nSTOCK++;
   }
   stats.porHoja["STOCK"] = nSTOCK;
@@ -240,7 +241,7 @@ async function main() {
     ].filter(Boolean).join(" ");
 
     if (candidatos.has(serial)) stats.duplicadosDentroHoja++;
-    candidatos.set(serial, { numeroSerie: serial, tipo: "ROUTER", tipoPersonalizado: null, nombre, descripcion: notas, estado, tecnicoId, ubicacion, origenHoja: "Routers" });
+    candidatos.set(serial, { numeroSerie: serial, tipo: "ROUTER", tipoPersonalizado: null, nombre, descripcion: notas, imei: imei || null, estado, tecnicoId, ubicacion, origenHoja: "Routers" });
     nRouters++;
   }
   stats.porHoja["Routers"] = nRouters;
@@ -284,6 +285,7 @@ async function main() {
       tipoPersonalizado: null,
       nombre,
       descripcion: notas,
+      imei: imei || null,
       estado,
       tecnicoId,
       ubicacion,
@@ -330,6 +332,7 @@ async function main() {
           tipoPersonalizado: c.tipoPersonalizado,
           nombre: c.nombre,
           descripcion: c.descripcion,
+          imei: c.imei,
           estado: c.estado,
           tecnicoId: c.tecnicoId,
           ubicacion: c.ubicacion,

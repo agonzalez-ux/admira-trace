@@ -10,6 +10,7 @@ type Material = {
   tipo: string;
   tipoPersonalizado: string | null;
   nombre: string;
+  imei: string | null;
   estado: string;
 };
 
@@ -104,7 +105,10 @@ export default function MiMaterialList({ tecnicoId, tecnicoLabel }: { tecnicoId?
         {visibles.map((m) => (
           <div key={m.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between">
             <div>
-              <div className="font-mono text-xs text-slate-500">S/N: {m.numeroSerie}</div>
+              <div className="font-mono text-xs text-slate-500">
+                S/N: {m.numeroSerie}
+                {m.imei && <span className="text-slate-400"> · IMEI: {m.imei}</span>}
+              </div>
               <div className="text-sm font-medium text-slate-800">
                 {etiquetaTipo(m)} · {m.nombre}
               </div>

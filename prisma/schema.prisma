@@ -138,6 +138,9 @@ model Material {
   tipoPersonalizado String?
   nombre       String
   descripcion  String?
+  // Solo tiene sentido para routers (tipo "PC" u otros no lo usan). Es un dato
+  // fijo de la propia unidad, no cambia con envíos/instalaciones.
+  imei         String?
   estado       String   @default("EN_FDM")
   tecnicoId    String?
   tecnico      User?    @relation("MaterialTecnico", fields: [tecnicoId], references: [id])

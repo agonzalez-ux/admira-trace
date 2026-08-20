@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { numeroSerie, tipo, tipoPersonalizado, nombre, descripcion } = body || {};
+  const { numeroSerie, tipo, tipoPersonalizado, nombre, descripcion, imei } = body || {};
 
   if (!numeroSerie || !tipo || !nombre) {
     return NextResponse.json({ error: "Faltan campos obligatorios." }, { status: 400 });
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       tipoPersonalizado: tipo === "OTRO" ? String(tipoPersonalizado).trim() : null,
       nombre,
       descripcion: descripcion || null,
+      imei: tipo === "ROUTER" ? String(imei || "").trim() || null : null,
       estado: estadoInicial,
       ubicacion: `Almacén ${almacen}`,
     },

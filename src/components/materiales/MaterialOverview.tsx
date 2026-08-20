@@ -10,6 +10,7 @@ type Material = {
   tipo: string;
   tipoPersonalizado: string | null;
   nombre: string;
+  imei: string | null;
   estado: string;
   tecnico: { id: string; name: string; zona: string | null } | null;
 };
@@ -92,7 +93,10 @@ function MaterialCard({ m }: { m: Material }) {
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between">
       <div>
-        <div className="font-mono text-xs text-slate-500">S/N: {m.numeroSerie}</div>
+        <div className="font-mono text-xs text-slate-500">
+          S/N: {m.numeroSerie}
+          {m.imei && <span className="text-slate-400"> · IMEI: {m.imei}</span>}
+        </div>
         <div className="text-sm font-medium text-slate-800">
           {etiquetaTipo(m)} · {m.nombre}
         </div>

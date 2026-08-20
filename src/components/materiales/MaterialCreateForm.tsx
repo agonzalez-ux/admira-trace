@@ -25,6 +25,7 @@ export default function MaterialCreateForm({
   const [tipoPersonalizado, setTipoPersonalizado] = useState("");
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [imei, setImei] = useState("");
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -98,7 +99,14 @@ export default function MaterialCreateForm({
     const res = await fetch("/api/materiales", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ numeroSerie, tipo, tipoPersonalizado, nombre, descripcion }),
+      body: JSON.stringify({
+        numeroSerie,
+        tipo,
+        tipoPersonalizado,
+        nombre,
+        descripcion,
+        imei: tipo === "ROUTER" ? imei.trim() || undefined : undefined,
+      }),
     });
     const data = await res.json();
     setSaving(false);
@@ -109,6 +117,7 @@ export default function MaterialCreateForm({
     setNombre("");
     setDescripcion("");
     setTipoPersonalizado("");
+    setImei("");
     setAutorrelleno(null);
     setDuplicado(null);
     onCreated();
@@ -177,6 +186,15 @@ export default function MaterialCreateForm({
         />
       )}
 
+      {tipo === "ROUTER" && (
+        <input
+          value={imei}
+          onChange={(e) => setImei(e.target.value.replace(/[^0-9]/g, ""))}
+          placeholder="IMEI (opcional, si el router lo tiene)"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono"
+        />
+      )}
+
       <input
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
@@ -203,10 +221,12 @@ export default function MaterialCreateForm({
 
       {scanning && (
         <SerialNumberScanner
-          onScan={(numeroExtraido) => {
-            setNumeroSerie(numeroExtraido);
+          pedirImei={tipo === "ROUTER"}
+          onScan={(datos) => {
+            setNumeroSerie(datos.numeroSerie);
+            if (datos.imei) setImei(datos.imei);
             setScanning(false);
-            rellenarDesdeNumeroSerie(numeroExtraido);
+            rellenarDesdeNumeroSerie(datos.numeroSerie);
           }}
           onClose={() => setScanning(false)}
         />
