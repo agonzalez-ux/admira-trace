@@ -1,16 +1,22 @@
 import type { MetadataRoute } from "next";
 
-// Permite "Añadir a pantalla de inicio" en Android/iOS. En iOS (16.4+) esto
-// es imprescindible para poder activar notificaciones push: Safari solo
-// concede permiso de notificación a la app instalada en modo standalone, no
-// a una pestaña normal — ver el aviso en NotificationBell.tsx.
+// Esto NO convierte Admira Trace en una app aparte — sigue siendo una web
+// normal, se abre igual en cualquier navegador y las notificaciones se
+// activan igual desde una pestaña normal (Android, escritorio...). Este
+// archivo solo existe por el caso de iPhone/iPad: Apple, a partir de iOS
+// 16.4, solo concede permiso de notificaciones push a una web que se ha
+// añadido a la pantalla de inicio — es una restricción del propio Safari/
+// iOS, no algo que dependa de este código, y afecta a cualquier web con
+// notificaciones push, no solo a esta. `display: "browser"` (en vez de
+// "standalone") evita además que Chrome/Android la trate como una app
+// instalable con su propio aviso — sigue siendo solo una web con icono.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Admira Trace",
     short_name: "Admira Trace",
     description: "Gestión de instalaciones e inventario — Altadis",
     start_url: "/",
-    display: "standalone",
+    display: "browser",
     background_color: "#f8fafc",
     theme_color: "#1f3fc4",
     icons: [
