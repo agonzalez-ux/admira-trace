@@ -103,17 +103,17 @@ export default function MiMaterialList({ tecnicoId, tecnicoLabel }: { tecnicoId?
           </p>
         )}
         {visibles.map((m) => (
-          <div key={m.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between">
-            <div>
-              <div className="font-mono text-xs text-slate-500">
+          <div key={m.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="font-mono text-xs text-slate-500 truncate">
                 S/N: {m.numeroSerie}
                 {m.imei && <span className="text-slate-400"> · IMEI: {m.imei}</span>}
               </div>
-              <div className="text-sm font-medium text-slate-800">
+              <div className="text-sm font-medium text-slate-800 truncate">
                 {etiquetaTipo(m)} · {m.nombre}
               </div>
             </div>
-            <span className={`text-[11px] rounded-full px-2 py-1 whitespace-nowrap ${ESTADO_COLORS[m.estado] || "bg-slate-100"}`}>
+            <span className={`text-[11px] rounded-full px-2 py-1 whitespace-nowrap shrink-0 ${ESTADO_COLORS[m.estado] || "bg-slate-100"}`}>
               {ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado}
             </span>
           </div>

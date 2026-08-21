@@ -38,7 +38,18 @@ export default function NotificationBell() {
   const [abierto, setAbierto] = useState(false);
   const [pushActivo, setPushActivo] = useState<boolean | null>(null); // null = aún no lo sabemos
   const [activandoPush, setActivandoPush] = useState(false);
+  const [errorPush, setErrorPush] = useState<string | null>(null);
   const contenedorRef = useRef<HTMLDivElement>(null);
+
+  // En iPhone/iPad, Safari solo permite pedir permiso de notificaciones a la
+  // app ya instalada en la pantalla de inicio (modo standalone) — en una
+  // pestaña normal ni siquiera existe `Notification`/`PushManager`, así que
+  // hay que explicarlo en vez de dejar que el botón falle en silencio.
+  const esIOS =
+    typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent) && !("MSStream" in window);
+  const esStandalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as any).standalone === true);
 
   const cargar = useCallback(async () => {
     try {
@@ -84,11 +95,28 @@ export default function NotificationBell() {
   async function activarPush() {
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapidKey) return;
+    setErrorPush(null);
+
+    if (esIOS && !esStandalone) {
+      setErrorPush(
+        'En iPhone/iPad, primero añade Admira Trace a la pantalla de inicio: toca "Compartir" y luego "Añadir a pantalla de inicio", y ábrela desde ahí para poder activar las notificaciones.'
+      );
+      return;
+    }
+    if (typeof Notification === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setErrorPush("Este navegador no admite notificaciones push.");
+      return;
+    }
 
     setActivandoPush(true);
     try {
       const permiso = await Notification.requestPermission();
       if (permiso !== "granted") {
+        setErrorPush(
+          permiso === "denied"
+            ? "Las notificaciones están bloqueadas para esta app — actívalas desde los ajustes del navegador."
+            : null
+        );
         setActivandoPush(false);
         return;
       }
@@ -106,6 +134,7 @@ export default function NotificationBell() {
       setPushActivo(true);
     } catch (err) {
       console.error("No se pudo activar la notificación push:", err);
+      setErrorPush("No se pudo activar. Inténtalo de nuevo.");
     } finally {
       setActivandoPush(false);
     }
@@ -139,7 +168,7 @@ export default function NotificationBell() {
       </button>
 
       {abierto && (
-        <div className="absolute right-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 z-30">
+        <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 z-30">
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
             <span className="font-semibold text-sm">Notificaciones</span>
             {noLeidas > 0 && (
@@ -161,6 +190,7 @@ export default function NotificationBell() {
               >
                 {activandoPush ? "Activando…" : "🔔 Activar notificaciones"}
               </button>
+              {errorPush && <p className="text-[11px] text-amber-900 mt-1.5">{errorPush}</p>}
             </div>
           )}
 

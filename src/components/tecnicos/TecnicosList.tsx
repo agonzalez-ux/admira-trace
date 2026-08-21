@@ -111,23 +111,23 @@ export default function TecnicosList() {
           <button
             key={t.id}
             onClick={() => setSeleccionado(t.id)}
-            className="w-full text-left bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between hover:border-admira-300 transition-colors"
+            className="w-full text-left bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex items-center justify-between gap-2 hover:border-admira-300 transition-colors"
           >
-            <div>
-              <div className="font-medium text-slate-800 flex items-center gap-2">
-                {t.name}
+            <div className="min-w-0">
+              <div className="font-medium text-slate-800 flex items-center gap-2 min-w-0">
+                <span className="truncate">{t.name}</span>
                 {hayCoincidenciaDireccion && idx === 0 && (
-                  <span className="text-[10px] bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">Más cercano</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 shrink-0">Más cercano</span>
                 )}
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-500 truncate">
                 @{t.username} {t.zona ? `· ${t.zona}` : ""} {t.phone ? `· ${t.phone}` : ""}
               </div>
-              {t.email && <div className="text-xs text-slate-500">✉️ {t.email}</div>}
-              {t.personaContacto && <div className="text-[11px] text-slate-400">Contacto: {t.personaContacto}</div>}
-              {t.direccion && <div className="text-xs text-slate-400">{t.direccion}</div>}
+              {t.email && <div className="text-xs text-slate-500 truncate">✉️ {t.email}</div>}
+              {t.personaContacto && <div className="text-[11px] text-slate-400 truncate">Contacto: {t.personaContacto}</div>}
+              {t.direccion && <div className="text-xs text-slate-400 truncate">{t.direccion}</div>}
               {t.radioCobertura && (
-                <div className="text-[11px] text-slate-400">Cobertura sin coste: {t.radioCobertura}</div>
+                <div className="text-[11px] text-slate-400 truncate">Cobertura sin coste: {t.radioCobertura}</div>
               )}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">

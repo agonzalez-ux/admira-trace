@@ -13,7 +13,7 @@ function SelectorProyecto() {
     <select
       value={proyecto}
       onChange={(e) => setProyecto(e.target.value as Proyecto)}
-      className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-2 py-1.5 transition-colors text-white [&>option]:text-slate-800"
+      className="max-w-[7rem] sm:max-w-none text-sm bg-white/15 hover:bg-white/25 rounded-lg px-2 py-1.5 transition-colors text-white [&>option]:text-slate-800"
       title="Cambiar de proyecto — filtra incidencias, material y técnicos"
     >
       {PROYECTOS.map((p) => (
@@ -55,26 +55,28 @@ export default function TopBar({
 
   return (
     <>
-      <div className={`${roleColor} text-white px-4 py-4 flex items-center justify-between shadow-md sticky top-0 z-20`}>
-        <div>
-          <div className="font-bold text-lg leading-tight">{title}</div>
-          {subtitle && <div className="text-xs text-white/80">{subtitle}</div>}
+      <div className={`${roleColor} text-white px-4 py-3 flex items-center justify-between gap-2 shadow-md sticky top-0 z-20`}>
+        <div className="min-w-0">
+          <div className="font-bold text-lg leading-tight truncate">{title}</div>
+          {subtitle && <div className="text-xs text-white/80 truncate">{subtitle}</div>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {mostrarSelectorProyecto && <SelectorProyecto />}
           <NotificationBell />
           <button
             onClick={() => setAbierto(true)}
-            className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors"
+            className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-2 sm:px-3 py-1.5 transition-colors"
             title="Cambiar contraseña"
           >
             🔑
           </button>
           <button
             onClick={logout}
-            className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors"
+            className="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-2 sm:px-3 py-1.5 transition-colors"
+            title="Cerrar sesión"
           >
-            Cerrar sesión
+            <span className="sm:hidden">🚪</span>
+            <span className="hidden sm:inline">Cerrar sesión</span>
           </button>
         </div>
       </div>

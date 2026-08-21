@@ -226,7 +226,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-3">
       <h3 className="font-semibold text-slate-800">Nuevo envío / recogida / transferencia</h3>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de movimiento</label>
           <select
@@ -292,7 +292,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
           No hace falta elegir piezas concretas — el almacén escaneará los números de serie reales al preparar el
           envío, y así queda registrado qué unidad exacta se manda.
         </p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {CATEGORIAS_FIJAS.map((t) => (
             <div key={t} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-2 py-1.5">
               <label className="text-xs text-slate-600 min-w-0 truncate" title={TIPO_MATERIAL_LABELS[t]}>
@@ -390,7 +390,7 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
           <p className="text-xs font-medium text-sky-900">
             Datos para avisar a {TRANSPORTISTA_LABELS[transportista]} por email (obligatorios para poder mandar la petición)
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block text-[11px] text-sky-800 mb-1">Día de recogida</label>
               <input
@@ -438,13 +438,13 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
           </div>
           <div>
             <label className="block text-[11px] text-sky-800 mb-1">Dimensiones del bulto (cm)</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input type="number" min={0} placeholder="Largo" value={bultoLargoCm} onChange={(e) => setBultoLargoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
               <input type="number" min={0} placeholder="Ancho" value={bultoAnchoCm} onChange={(e) => setBultoAnchoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
               <input type="number" min={0} placeholder="Alto" value={bultoAltoCm} onChange={(e) => setBultoAltoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block text-[11px] text-sky-800 mb-1">Ciudad de recogida</label>
               <input value={ciudadRecogida} onChange={(e) => setCiudadRecogida(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />

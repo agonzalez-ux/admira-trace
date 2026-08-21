@@ -104,7 +104,7 @@ export default function CleanupPanel() {
                   <span className="font-mono text-slate-600">{new Date(log.fecha).toLocaleString("es-ES")}</span>
                   <span className="text-slate-500">{log.duracion}</span>
                 </div>
-                <div className="flex gap-4 text-slate-600">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-600">
                   <span>📸 Movidas: {log.fotosMovidas}</span>
                   <span>🗑️ Eliminadas: {log.fotosEliminadas}</span>
                   <span>💾 Backups limpiados: {log.backupsLimpiados}</span>

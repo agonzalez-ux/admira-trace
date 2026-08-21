@@ -173,7 +173,7 @@ export default function OrdenesRecurrentes({
               </>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[11px] font-medium text-slate-600 mb-1">Frecuencia</label>
                     <select value={frecuencia} onChange={(e) => setFrecuencia(Number(e.target.value))} className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
@@ -193,7 +193,7 @@ export default function OrdenesRecurrentes({
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600 mb-1">Material a reponer cada vez</label>
-                  <div className="grid grid-cols-2 gap-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                     {CATEGORIAS_FIJAS.map((tipo) => {
                       const actual = config.find((i) => i.tipo === tipo)?.cantidad || 0;
                       return (

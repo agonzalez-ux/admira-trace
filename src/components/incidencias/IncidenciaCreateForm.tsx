@@ -56,7 +56,7 @@ export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => v
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-3">
       <h3 className="font-semibold text-slate-800">Asignar incidencia / ticket</h3>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">ID ticket del desk (opcional)</label>
           <input value={ticketExternoId} onChange={(e) => setTicketExternoId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" placeholder="DESK-10234" />
@@ -86,7 +86,7 @@ export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => v
         <label className="block text-xs font-medium text-slate-600 mb-1">Descripción</label>
         <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={2} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Cliente</label>
           <input value={cliente} onChange={(e) => setCliente(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
