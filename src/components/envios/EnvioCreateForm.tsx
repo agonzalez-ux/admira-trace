@@ -1,9 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { TIPO_MATERIAL_LABELS, TIPOS_MATERIAL, TRANSPORTISTAS, FRECUENCIAS_RECURRENTES } from "@/lib/constants";
-import { TIPOS_MOVIMIENTO, type TipoMovimientoId } from "@/lib/envioLabel";
+import {
+  TIPO_MATERIAL_LABELS,
+  TIPOS_MATERIAL,
+  TRANSPORTISTAS,
+  TRANSPORTISTA_LABELS,
+  TRANSPORTISTAS_CON_EMAIL_AUTOMATICO,
+  FRECUENCIAS_RECURRENTES,
+  FRANJAS_RECOGIDA,
+  TIPOS_BULTO,
+  TIPO_BULTO_LABELS,
+} from "@/lib/constants";
+import { TIPOS_MOVIMIENTO, origenRolFor, type TipoMovimientoId } from "@/lib/envioLabel";
 import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
+
+const GLS_PORTAL_URL = process.env.NEXT_PUBLIC_GLS_PORTAL_URL || "";
 
 type Tecnico = { id: string; name: string; zona: string | null };
 type Material = { id: string; tipo: string };
@@ -29,6 +41,21 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [frecuenciaDias, setFrecuenciaDias] = useState<number>(30);
   const [notas, setNotas] = useState("");
+  // Datos para avisar al transportista (Maresa/Rhenus) — solo hacen falta
+  // aquí cuando quien crea el movimiento (Admira) es también el origen; si
+  // el origen es FDM o el técnico, se le pedirán a él después.
+  const [fechaRecogida, setFechaRecogida] = useState("");
+  const [franjaRecogida, setFranjaRecogida] = useState<string>(FRANJAS_RECOGIDA[0].id);
+  const [tipoBulto, setTipoBulto] = useState<string>(TIPOS_BULTO[0]);
+  const [bultoLargoCm, setBultoLargoCm] = useState("");
+  const [bultoAnchoCm, setBultoAnchoCm] = useState("");
+  const [bultoAltoCm, setBultoAltoCm] = useState("");
+  const [bultoPesoKg, setBultoPesoKg] = useState("");
+  const [detalleTransporte, setDetalleTransporte] = useState("");
+  const [ciudadRecogida, setCiudadRecogida] = useState("");
+  const [direccionRecogida, setDireccionRecogida] = useState("");
+  const [ciudadEntrega, setCiudadEntrega] = useState("");
+  const [direccionEntrega, setDireccionEntrega] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -39,6 +66,9 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
   const [disponibles, setDisponibles] = useState<Record<string, number>>({});
 
   const config = TIPOS_MOVIMIENTO.find((m) => m.id === movimiento)!;
+
+  const conEmailAutomatico = TRANSPORTISTAS_CON_EMAIL_AUTOMATICO.includes(transportista as any);
+  const origenEsQuienCrea = conEmailAutomatico && origenRolFor({ tipo: config.tipo, almacen: config.almacen }) === "ADMIRA";
 
   useEffect(() => {
     fetch("/api/tecnicos")
@@ -107,6 +137,11 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
       return setError('Indica a mano qué material es exactamente en cada línea de "Otro" (o quítala si no hace falta).');
     }
     if (pedido.length === 0) return setError("Indica al menos una categoría de material con cantidad.");
+    if (origenEsQuienCrea) {
+      if (!fechaRecogida || !franjaRecogida || !tipoBulto || !bultoLargoCm || !bultoAnchoCm || !bultoAltoCm || !bultoPesoKg || !direccionRecogida || !direccionEntrega) {
+        return setError(`Para avisar a ${TRANSPORTISTA_LABELS[transportista]} hace falta rellenar los datos de recogida/bulto de abajo.`);
+      }
+    }
     setSaving(true);
 
     const res = await fetch("/api/envios", {
@@ -121,6 +156,22 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
         esRecurrente: config.tipo === "ENVIO" ? esRecurrente : false,
         frecuenciaDias: esRecurrente ? frecuenciaDias : undefined,
         notas,
+        datosTransporte: origenEsQuienCrea
+          ? {
+              fechaRecogida,
+              franjaRecogida,
+              tipoBulto,
+              bultoLargoCm,
+              bultoAnchoCm,
+              bultoAltoCm,
+              bultoPesoKg,
+              detalleTransporte,
+              ciudadRecogida,
+              direccionRecogida,
+              ciudadEntrega,
+              direccionEntrega,
+            }
+          : undefined,
       }),
     });
     const data = await res.json();
@@ -138,6 +189,16 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     setCantidades({});
     setOtros([]);
     setNotas("");
+    setFechaRecogida("");
+    setBultoLargoCm("");
+    setBultoAnchoCm("");
+    setBultoAltoCm("");
+    setBultoPesoKg("");
+    setDetalleTransporte("");
+    setCiudadRecogida("");
+    setDireccionRecogida("");
+    setCiudadEntrega("");
+    setDireccionEntrega("");
     onCreated();
   }
 
@@ -163,11 +224,31 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
           <label className="block text-xs font-medium text-slate-600 mb-1">Transportista</label>
           <select value={transportista} onChange={(e) => setTransportista(e.target.value as any)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
             {TRANSPORTISTAS.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>{TRANSPORTISTA_LABELS[t]}</option>
             ))}
           </select>
         </div>
       </div>
+
+      {transportista === "GLS" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
+          GLS se gestiona en su propio portal — Admira Trace no manda la petición automáticamente.
+          {GLS_PORTAL_URL ? (
+            <a
+              href={GLS_PORTAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-1 font-medium underline hover:text-amber-700"
+            >
+              🔗 Abrir portal de GLS
+            </a>
+          ) : (
+            <span className="block text-[11px] text-amber-700 mt-1">
+              (Falta configurar la URL del portal de GLS.)
+            </span>
+          )}
+        </div>
+      )}
 
       {config.requiereTecnico && (
         <div>
@@ -280,6 +361,101 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
             Se creará una orden automática: cada {frecuenciaDias} días se generará un envío con el mismo pedido por
             categorías. Podrás editarla o eliminarla desde la ficha del técnico.
           </p>
+        </div>
+      )}
+
+      {origenEsQuienCrea && (
+        <div className="bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-medium text-sky-900">
+            Datos para avisar a {TRANSPORTISTA_LABELS[transportista]} por email (obligatorios para poder mandar la petición)
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] text-sky-800 mb-1">Día de recogida</label>
+              <input
+                type="date"
+                value={fechaRecogida}
+                onChange={(e) => setFechaRecogida(e.target.value)}
+                className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] text-sky-800 mb-1">Horario</label>
+              <select
+                value={franjaRecogida}
+                onChange={(e) => setFranjaRecogida(e.target.value)}
+                className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+              >
+                {FRANJAS_RECOGIDA.map((f) => (
+                  <option key={f.id} value={f.id}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] text-sky-800 mb-1">Tipo de bulto</label>
+              <select
+                value={tipoBulto}
+                onChange={(e) => setTipoBulto(e.target.value)}
+                className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+              >
+                {TIPOS_BULTO.map((t) => (
+                  <option key={t} value={t}>{TIPO_BULTO_LABELS[t]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] text-sky-800 mb-1">Peso (kg)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.1"
+                value={bultoPesoKg}
+                onChange={(e) => setBultoPesoKg(e.target.value)}
+                className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] text-sky-800 mb-1">Dimensiones del bulto (cm)</label>
+            <div className="grid grid-cols-3 gap-2">
+              <input type="number" min={0} placeholder="Largo" value={bultoLargoCm} onChange={(e) => setBultoLargoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+              <input type="number" min={0} placeholder="Ancho" value={bultoAnchoCm} onChange={(e) => setBultoAnchoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+              <input type="number" min={0} placeholder="Alto" value={bultoAltoCm} onChange={(e) => setBultoAltoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] text-sky-800 mb-1">Ciudad de recogida</label>
+              <input value={ciudadRecogida} onChange={(e) => setCiudadRecogida(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="block text-[11px] text-sky-800 mb-1">Ciudad de entrega</label>
+              <input value={ciudadEntrega} onChange={(e) => setCiudadEntrega(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] text-sky-800 mb-1">Dirección de recogida</label>
+            <input value={direccionRecogida} onChange={(e) => setDireccionRecogida(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-[11px] text-sky-800 mb-1">Dirección de entrega</label>
+            <input value={direccionEntrega} onChange={(e) => setDireccionEntrega(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-[11px] text-sky-800 mb-1">Detalle para el transportista (pulgadas, mezcla de material…)</label>
+            <input
+              value={detalleTransporte}
+              onChange={(e) => setDetalleTransporte(e.target.value)}
+              placeholder='ej. "TFTs de 32 y 43 pulgadas"'
+              className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+            />
+          </div>
+        </div>
+      )}
+
+      {conEmailAutomatico && !origenEsQuienCrea && (
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
+          El origen de este movimiento todavía no eres tú: se avisará a quien corresponda ({config.tipo === "RECOGIDA" ? "el técnico" : "el almacén FDM"}) para que rellene el día/horario de recogida y el bulto antes de mandar el email a {TRANSPORTISTA_LABELS[transportista]}.
         </div>
       )}
 

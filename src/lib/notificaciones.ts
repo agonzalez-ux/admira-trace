@@ -11,6 +11,8 @@ export type TipoNotificacion =
   | "ENVIO_EN_CAMINO"
   | "ENVIO_RECIBIDO"
   | "ENVIO_INCIDENCIA_STOCK"
+  | "ENVIO_DATOS_TRANSPORTE_PENDIENTES"
+  | "ENVIO_TRANSPORTISTA_AVISADO"
   | "INCIDENCIA_ASIGNADA"
   | "INCIDENCIA_EN_CAMINO"
   | "INCIDENCIA_RESUELTA"
@@ -71,6 +73,17 @@ export async function notificarEquipoAdmira(
     select: { id: true },
   });
   await notificarVarios(admiras.map((a) => a.id), datos);
+}
+
+/** Igual que notificarEquipoAdmira, pero para el almacén FDM (cuenta compartida del equipo). */
+export async function notificarEquipoFDM(
+  datos: Omit<Parameters<typeof crearNotificacion>[0], "userId">
+): Promise<void> {
+  const fdm = await prisma.user.findMany({
+    where: { role: "FDM", active: true },
+    select: { id: true },
+  });
+  await notificarVarios(fdm.map((f) => f.id), datos);
 }
 
 function urlEntidad(entidadTipo?: EntidadTipo, entidadId?: string): string | undefined {

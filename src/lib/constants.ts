@@ -76,8 +76,39 @@ export const FRECUENCIAS_RECURRENTES = [
 export const TIPOS_ENVIO = ["ENVIO", "RECOGIDA", "TRANSFERENCIA"] as const;
 export type TipoEnvio = (typeof TIPOS_ENVIO)[number];
 
-export const TRANSPORTISTAS = ["MARESA", "RENUS", "OTRO"] as const;
+export const TRANSPORTISTAS = ["MARESA", "RENUS", "GLS", "OTRO"] as const;
 export type Transportista = (typeof TRANSPORTISTAS)[number];
+
+// "RENUS" es el valor interno histórico — el transportista real se llama
+// "Rhenus", se muestra así en toda la interfaz sin tocar lo ya guardado.
+export const TRANSPORTISTA_LABELS: Record<Transportista, string> = {
+  MARESA: "Maresa",
+  RENUS: "Rhenus",
+  GLS: "GLS",
+  OTRO: "Otro",
+};
+
+// Maresa y Rhenus se avisan con un email automático (ver
+// src/lib/transportistas.ts); GLS se gestiona en su propio portal (solo se
+// ofrece un enlace directo); "Otro" no automatiza nada.
+export const TRANSPORTISTAS_CON_EMAIL_AUTOMATICO: readonly Transportista[] = ["MARESA", "RENUS"];
+
+export const FRANJAS_RECOGIDA = [
+  { id: "MANANA", label: "Mañana (9-14h)" },
+  { id: "TARDE", label: "Tarde (14-18h)" },
+  { id: "TODO_DIA", label: "Todo el día" },
+] as const;
+export type FranjaRecogida = (typeof FRANJAS_RECOGIDA)[number]["id"];
+export const FRANJA_RECOGIDA_LABELS: Record<FranjaRecogida, string> = Object.fromEntries(
+  FRANJAS_RECOGIDA.map((f) => [f.id, f.label])
+) as Record<FranjaRecogida, string>;
+
+export const TIPOS_BULTO = ["BULTO", "PALET"] as const;
+export type TipoBulto = (typeof TIPOS_BULTO)[number];
+export const TIPO_BULTO_LABELS: Record<TipoBulto, string> = {
+  BULTO: "Bulto suelto",
+  PALET: "Palet",
+};
 
 export const ESTADOS_ENVIO = [
   "PENDIENTE_PREPARACION",

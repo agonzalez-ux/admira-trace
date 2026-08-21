@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import { syncToSheets } from "./googleSheets";
 import { parsePedido, nombreAlmacen } from "./envioLabel";
+import { TRANSPORTISTAS_CON_EMAIL_AUTOMATICO } from "./constants";
+import { notificarDatosTransportePendientes } from "./envios";
 
 export function calcularProximaEjecucion(desde: Date, frecuenciaDias: number): Date {
   const proxima = new Date(desde);
@@ -39,7 +41,13 @@ export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generado
     const notasPartes = ["Envío generado automáticamente por orden recurrente."];
     if (orden.notas) notasPartes.push(orden.notas);
 
-    await prisma.envio.create({
+    // Al ser generado en background (sin nadie delante rellenando un
+    // formulario), nunca se conoce el bulto real en el momento de crearlo —
+    // aunque el almacén de origen sea Admira, hace falta que alguien lo
+    // rellene después para poder avisar al transportista.
+    const conEmailAutomatico = TRANSPORTISTAS_CON_EMAIL_AUTOMATICO.includes(orden.transportista as any);
+
+    const envioCreado = await prisma.envio.create({
       data: {
         tipo: "ENVIO",
         transportista: orden.transportista,
@@ -52,8 +60,13 @@ export async function ejecutarOrdenesRecurrentesPendientes(): Promise<{ generado
         ordenRecurrenteId: orden.id,
         notas: notasPartes.join(" · "),
         creadoPorId: orden.creadoPorId,
+        ...(conEmailAutomatico ? { emailTransportistaEstado: "PENDIENTE_DATOS" } : {}),
       },
     });
+
+    if (conEmailAutomatico) {
+      await notificarDatosTransportePendientes(envioCreado);
+    }
 
     await prisma.ordenRecurrente.update({
       where: { id: orden.id },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FRECUENCIAS_RECURRENTES, TIPO_MATERIAL_LABELS, TIPOS_MATERIAL, TRANSPORTISTAS } from "@/lib/constants";
+import { FRECUENCIAS_RECURRENTES, TIPO_MATERIAL_LABELS, TIPOS_MATERIAL, TRANSPORTISTAS, TRANSPORTISTA_LABELS } from "@/lib/constants";
 import { parsePedido, etiquetaPedido, type PedidoItem } from "@/lib/envioLabel";
 
 export type OrdenRecurrente = {
@@ -186,7 +186,7 @@ export default function OrdenesRecurrentes({
                     <label className="block text-[11px] font-medium text-slate-600 mb-1">Transportista</label>
                     <select value={transportista} onChange={(e) => setTransportista(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
                       {TRANSPORTISTAS.map((t) => (
-                        <option key={t} value={t}>{t}</option>
+                        <option key={t} value={t}>{TRANSPORTISTA_LABELS[t]}</option>
                       ))}
                     </select>
                   </div>

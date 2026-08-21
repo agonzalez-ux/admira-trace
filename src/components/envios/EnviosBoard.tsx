@@ -5,9 +5,14 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   ESTADO_ENVIO_LABELS,
   EstadoEnvio,
+  FRANJAS_RECOGIDA,
+  TIPOS_BULTO,
+  TIPO_BULTO_LABELS,
 } from "@/lib/constants";
 import { parsePedido, etiquetaPedido, etiquetaTipoMovimiento, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
 import { etiquetaTipo } from "@/lib/materialLabel";
+
+const GLS_PORTAL_URL = process.env.NEXT_PUBLIC_GLS_PORTAL_URL || "";
 
 type Material = {
   id: string;
@@ -39,6 +44,8 @@ type Envio = {
   tecnico: { id: string; name: string; zona: string | null } | null;
   creadoPor?: { name: string };
   items: EnvioItem[];
+  emailTransportistaEstado: string | null;
+  emailTransportistaError: string | null;
 };
 
 const ESTADO_COLORS: Record<string, string> = {
@@ -49,6 +56,36 @@ const ESTADO_COLORS: Record<string, string> = {
   INCIDENCIA: "bg-red-100 text-red-800",
 };
 
+type DatosTransporte = {
+  fechaRecogida: string;
+  franjaRecogida: string;
+  tipoBulto: string;
+  bultoLargoCm: string;
+  bultoAnchoCm: string;
+  bultoAltoCm: string;
+  bultoPesoKg: string;
+  detalleTransporte: string;
+  ciudadRecogida: string;
+  direccionRecogida: string;
+  ciudadEntrega: string;
+  direccionEntrega: string;
+};
+
+const DATOS_TRANSPORTE_VACIOS: DatosTransporte = {
+  fechaRecogida: "",
+  franjaRecogida: FRANJAS_RECOGIDA[0].id,
+  tipoBulto: TIPOS_BULTO[0],
+  bultoLargoCm: "",
+  bultoAnchoCm: "",
+  bultoAltoCm: "",
+  bultoPesoKg: "",
+  detalleTransporte: "",
+  ciudadRecogida: "",
+  direccionRecogida: "",
+  ciudadEntrega: "",
+  direccionEntrega: "",
+};
+
 export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIRA" }) {
   const [envios, setEnvios] = useState<Envio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +94,10 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
   const [vista, setVista] = useState<"PENDIENTES" | "COMPLETADOS">("PENDIENTES");
   const [busqueda, setBusqueda] = useState("");
   const [finalizando, setFinalizando] = useState<string | null>(null);
+  const [rellenandoId, setRellenandoId] = useState<string | null>(null);
+  const [datosTransporte, setDatosTransporte] = useState<DatosTransporte>(DATOS_TRANSPORTE_VACIOS);
+  const [guardandoDatos, setGuardandoDatos] = useState(false);
+  const [reintentandoId, setReintentandoId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,6 +156,44 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
       text: "Movimiento cerrado con lo escaneado — se ha avisado a Admira de la diferencia para que lo revise.",
     });
     setScanTarget(null);
+    await load();
+  }
+
+  async function guardarDatosTransporte(envioId: string) {
+    setGuardandoDatos(true);
+    setFeedback(null);
+    const res = await fetch(`/api/envios/${envioId}/datos-transporte`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datosTransporte),
+    });
+    const data = await res.json();
+    setGuardandoDatos(false);
+    if (!res.ok) {
+      setFeedback({ type: "error", text: data.error || "Error al guardar los datos de transporte." });
+      return;
+    }
+    setFeedback({ type: "ok", text: "Datos guardados — se ha avisado al transportista." });
+    setRellenandoId(null);
+    setDatosTransporte(DATOS_TRANSPORTE_VACIOS);
+    await load();
+  }
+
+  async function reintentarAvisoTransportista(envioId: string) {
+    setReintentandoId(envioId);
+    setFeedback(null);
+    const res = await fetch(`/api/envios/${envioId}/datos-transporte`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    setReintentandoId(null);
+    if (!res.ok) {
+      setFeedback({ type: "error", text: data.error || "Error al reintentar el aviso." });
+      return;
+    }
+    setFeedback({ type: "ok", text: "Reintento hecho." });
     await load();
   }
 
@@ -193,6 +272,9 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
         const confirmadosDestino = envio.items.filter((i) => i.escaneadoDestino).length;
         const puedeFinalizar =
           side === "origen" ? escaneadosOrigen > 0 : side === "destino" ? confirmadosDestino > 0 : false;
+        const puedeRellenarTransporte =
+          envio.emailTransportistaEstado === "PENDIENTE_DATOS" && role === origenRolFor(envio);
+        const rellenandoEste = rellenandoId === envio.id;
 
         return (
           <div key={envio.id} className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
@@ -210,6 +292,31 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
                   <span className={`text-[11px] rounded-full px-2 py-0.5 ${ESTADO_COLORS[envio.estado] || "bg-slate-100"}`}>
                     {ESTADO_ENVIO_LABELS[envio.estado] || envio.estado}
                   </span>
+                  {envio.emailTransportistaEstado === "PENDIENTE_DATOS" && (
+                    <span className="text-[11px] rounded-full px-2 py-0.5 bg-amber-100 text-amber-800">
+                      Transportista: faltan datos
+                    </span>
+                  )}
+                  {envio.emailTransportistaEstado === "ENVIADO" && (
+                    <span className="text-[11px] rounded-full px-2 py-0.5 bg-emerald-100 text-emerald-800">
+                      Transportista avisado ✓
+                    </span>
+                  )}
+                  {envio.emailTransportistaEstado === "ERROR" && (
+                    <span className="text-[11px] rounded-full px-2 py-0.5 bg-red-100 text-red-800" title={envio.emailTransportistaError || undefined}>
+                      Error al avisar al transportista
+                    </span>
+                  )}
+                  {envio.transportista === "GLS" && GLS_PORTAL_URL && (
+                    <a
+                      href={GLS_PORTAL_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] rounded-full px-2 py-0.5 bg-slate-100 text-slate-700 hover:bg-slate-200 underline"
+                    >
+                      🔗 Portal GLS
+                    </a>
+                  )}
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
                   {envio.origen} → {envio.destino}
@@ -237,8 +344,134 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
                     {finalizando === envio.id ? "Cerrando…" : "Cerrar con lo escaneado"}
                   </button>
                 )}
+                {puedeRellenarTransporte && !rellenandoEste && (
+                  <button
+                    onClick={() => {
+                      setRellenandoId(envio.id);
+                      setDatosTransporte(DATOS_TRANSPORTE_VACIOS);
+                    }}
+                    className="bg-sky-600 text-white text-xs font-medium rounded-lg px-3 py-2 whitespace-nowrap"
+                  >
+                    Rellenar datos de transporte
+                  </button>
+                )}
+                {envio.emailTransportistaEstado === "ERROR" && role === origenRolFor(envio) && (
+                  <button
+                    onClick={() => reintentarAvisoTransportista(envio.id)}
+                    disabled={reintentandoId === envio.id}
+                    className="text-[11px] text-red-700 hover:underline disabled:opacity-60 whitespace-nowrap"
+                  >
+                    {reintentandoId === envio.id ? "Reintentando…" : "Reintentar aviso"}
+                  </button>
+                )}
               </div>
             </div>
+
+            {rellenandoEste && (
+              <div className="mt-3 bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-2">
+                <p className="text-xs font-medium text-sky-900">
+                  Datos para avisar a {envio.transportista} por email
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-sky-800 mb-1">Día de recogida</label>
+                    <input
+                      type="date"
+                      value={datosTransporte.fechaRecogida}
+                      onChange={(e) => setDatosTransporte((d) => ({ ...d, fechaRecogida: e.target.value }))}
+                      className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-sky-800 mb-1">Horario</label>
+                    <select
+                      value={datosTransporte.franjaRecogida}
+                      onChange={(e) => setDatosTransporte((d) => ({ ...d, franjaRecogida: e.target.value }))}
+                      className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+                    >
+                      {FRANJAS_RECOGIDA.map((f) => (
+                        <option key={f.id} value={f.id}>{f.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-sky-800 mb-1">Tipo de bulto</label>
+                    <select
+                      value={datosTransporte.tipoBulto}
+                      onChange={(e) => setDatosTransporte((d) => ({ ...d, tipoBulto: e.target.value }))}
+                      className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+                    >
+                      {TIPOS_BULTO.map((t) => (
+                        <option key={t} value={t}>{TIPO_BULTO_LABELS[t]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-sky-800 mb-1">Peso (kg)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={datosTransporte.bultoPesoKg}
+                      onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoPesoKg: e.target.value }))}
+                      className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-sky-800 mb-1">Dimensiones del bulto (cm)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input type="number" min={0} placeholder="Largo" value={datosTransporte.bultoLargoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoLargoCm: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                    <input type="number" min={0} placeholder="Ancho" value={datosTransporte.bultoAnchoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoAnchoCm: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                    <input type="number" min={0} placeholder="Alto" value={datosTransporte.bultoAltoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoAltoCm: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-sky-800 mb-1">Ciudad de recogida</label>
+                    <input value={datosTransporte.ciudadRecogida} onChange={(e) => setDatosTransporte((d) => ({ ...d, ciudadRecogida: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-sky-800 mb-1">Ciudad de entrega</label>
+                    <input value={datosTransporte.ciudadEntrega} onChange={(e) => setDatosTransporte((d) => ({ ...d, ciudadEntrega: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-sky-800 mb-1">Dirección de recogida</label>
+                  <input value={datosTransporte.direccionRecogida} onChange={(e) => setDatosTransporte((d) => ({ ...d, direccionRecogida: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-sky-800 mb-1">Dirección de entrega</label>
+                  <input value={datosTransporte.direccionEntrega} onChange={(e) => setDatosTransporte((d) => ({ ...d, direccionEntrega: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-sky-800 mb-1">Detalle para el transportista (pulgadas, mezcla de material…)</label>
+                  <input
+                    value={datosTransporte.detalleTransporte}
+                    onChange={(e) => setDatosTransporte((d) => ({ ...d, detalleTransporte: e.target.value }))}
+                    placeholder='ej. "TFTs de 32 y 43 pulgadas"'
+                    className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setRellenandoId(null)}
+                    className="text-xs text-slate-500 hover:underline px-2"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={guardandoDatos}
+                    onClick={() => guardarDatosTransporte(envio.id)}
+                    className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-60"
+                  >
+                    {guardandoDatos ? "Guardando…" : "Guardar y avisar al transportista"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {envio.items.length > 0 && (
               <div className="mt-3 space-y-1">

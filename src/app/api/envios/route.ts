@@ -4,7 +4,9 @@ import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { calcularProximaEjecucion } from "@/lib/ordenesRecurrentes";
 import { crearNotificacion } from "@/lib/notificaciones";
-import { nombreAlmacen, almacenOpuesto, etiquetaPedido, validarPedido } from "@/lib/envioLabel";
+import { nombreAlmacen, almacenOpuesto, etiquetaPedido, validarPedido, origenRolFor } from "@/lib/envioLabel";
+import { TRANSPORTISTAS_CON_EMAIL_AUTOMATICO } from "@/lib/constants";
+import { enviarCorreoTransportista, notificarDatosTransportePendientes } from "@/lib/envios";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -36,7 +38,17 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { tipo, transportista, almacen, tecnicoId, pedido, esRecurrente, frecuenciaDias, notas } = body || {};
+  const {
+    tipo,
+    transportista,
+    almacen,
+    tecnicoId,
+    pedido,
+    esRecurrente,
+    frecuenciaDias,
+    notas,
+    datosTransporte,
+  } = body || {};
 
   if (!["ENVIO", "RECOGIDA", "TRANSFERENCIA"].includes(tipo)) {
     return NextResponse.json({ error: "Tipo de movimiento no válido." }, { status: 400 });
@@ -46,6 +58,46 @@ export async function POST(req: NextRequest) {
   }
   if (almacen !== "FDM" && almacen !== "ADMIRA") {
     return NextResponse.json({ error: "Indica el almacén de origen." }, { status: 400 });
+  }
+
+  // Con Maresa/Rhenus hace falta avisar por email al transportista. Si quien
+  // está creando el envío es también el origen (Admira → técnico/almacén
+  // desde el propio almacén Admira), ya conoce el bulto real y lo rellena
+  // ahora mismo; si el origen es FDM o un técnico (recogida), esos datos
+  // todavía no existen y se pedirán después — ver notificarDatosTransportePendientes.
+  const conEmailAutomatico = TRANSPORTISTAS_CON_EMAIL_AUTOMATICO.includes(transportista);
+  const origenEsQuienCrea = conEmailAutomatico && origenRolFor({ tipo, almacen }) === "ADMIRA";
+  let datosTransporteValidados: Record<string, unknown> | null = null;
+  if (origenEsQuienCrea) {
+    const d = datosTransporte || {};
+    const camposFaltantes: string[] = [];
+    if (!d.fechaRecogida) camposFaltantes.push("día de recogida");
+    if (!d.franjaRecogida) camposFaltantes.push("horario de recogida");
+    if (!d.tipoBulto) camposFaltantes.push("tipo de bulto");
+    if (!d.bultoLargoCm || !d.bultoAnchoCm || !d.bultoAltoCm) camposFaltantes.push("dimensiones del bulto");
+    if (!d.bultoPesoKg) camposFaltantes.push("peso del bulto");
+    if (!d.direccionRecogida) camposFaltantes.push("dirección de recogida");
+    if (!d.direccionEntrega) camposFaltantes.push("dirección de entrega");
+    if (camposFaltantes.length > 0) {
+      return NextResponse.json(
+        { error: `Para avisar a ${transportista} hace falta indicar: ${camposFaltantes.join(", ")}.` },
+        { status: 400 }
+      );
+    }
+    datosTransporteValidados = {
+      fechaRecogida: new Date(d.fechaRecogida),
+      franjaRecogida: String(d.franjaRecogida),
+      tipoBulto: String(d.tipoBulto),
+      bultoLargoCm: Number(d.bultoLargoCm),
+      bultoAnchoCm: Number(d.bultoAnchoCm),
+      bultoAltoCm: Number(d.bultoAltoCm),
+      bultoPesoKg: Number(d.bultoPesoKg),
+      detalleTransporte: d.detalleTransporte ? String(d.detalleTransporte).trim() : null,
+      ciudadRecogida: d.ciudadRecogida ? String(d.ciudadRecogida).trim() : null,
+      direccionRecogida: String(d.direccionRecogida).trim(),
+      ciudadEntrega: d.ciudadEntrega ? String(d.ciudadEntrega).trim() : null,
+      direccionEntrega: String(d.direccionEntrega).trim(),
+    };
   }
 
   const resultadoPedido = validarPedido(pedido);
@@ -117,11 +169,27 @@ export async function POST(req: NextRequest) {
       ordenRecurrenteId,
       notas: notas || null,
       creadoPorId: session.userId,
+      ...(conEmailAutomatico
+        ? {
+            emailTransportistaEstado: origenEsQuienCrea ? null : "PENDIENTE_DATOS",
+            ...(datosTransporteValidados || {}),
+          }
+        : {}),
     },
     include: { items: { include: { material: true } }, tecnico: true },
   });
 
   await syncToSheets(["envios"]);
+
+  if (conEmailAutomatico) {
+    if (origenEsQuienCrea) {
+      // Ya tenemos todo lo necesario: se avisa al transportista al instante.
+      await enviarCorreoTransportista(envio.id);
+    } else {
+      // El origen real (FDM o el técnico) todavía tiene que rellenar el bulto.
+      await notificarDatosTransportePendientes(envio);
+    }
+  }
 
   const resumenPedido = etiquetaPedido(pedidoValidado);
 

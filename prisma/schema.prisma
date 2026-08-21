@@ -208,6 +208,31 @@ model Envio {
   fechaEnviado  DateTime?
   fechaRecibido DateTime?
 
+  // --- Datos logísticos para avisar al transportista (Maresa/Rhenus por
+  // email automático; GLS por su propio portal; Otro sin automatizar) ---
+  // Quien tiene el rol de origen (origenRolFor: el almacén que envía, o el
+  // técnico si es una recogida) es quien conoce el bulto real y debe
+  // rellenar esto antes de poder avisar — ver src/lib/transportistas.ts.
+  fechaRecogida    DateTime?
+  franjaRecogida   String? // MANANA | TARDE | TODO_DIA (ver FRANJAS_RECOGIDA)
+  tipoBulto        String? // BULTO | PALET
+  bultoLargoCm     Float?
+  bultoAnchoCm     Float?
+  bultoAltoCm      Float?
+  bultoPesoKg      Float?
+  // Descripción libre para el transportista (mezcla de material, pulgadas...).
+  detalleTransporte String?
+  ciudadRecogida    String?
+  direccionRecogida String?
+  ciudadEntrega     String?
+  direccionEntrega  String?
+  // null = no aplica (transportista GLS/OTRO, o Envio creado antes de esta
+  // función). PENDIENTE_DATOS = falta que el origen rellene lo de arriba.
+  // ENVIADO / ERROR = ya se intentó avisar por email al transportista.
+  emailTransportistaEstado    String?
+  emailTransportistaEnviadoEn DateTime?
+  emailTransportistaError     String?
+
   items EnvioItem[]
 }
 
