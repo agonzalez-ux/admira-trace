@@ -22,6 +22,10 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASSWORD = process.env.SMTP_PASSWORD;
 const SMTP_FROM = process.env.SMTP_FROM || (SMTP_USER ? `Admira Trace <${SMTP_USER}>` : "");
 const SMTP_REPLY_TO = process.env.SMTP_REPLY_TO || "";
+// Se pone en copia en TODOS los correos que manda la app, sin excepción —
+// para que ese buzón siga viendo todo lo que se envía aunque cambie la
+// cuenta que realmente los manda (SMTP_FROM/SMTP_USER).
+const SMTP_CC = process.env.SMTP_CC || "";
 
 // El relay por IP no lleva usuario ni contraseña: basta con tener el host.
 export const EMAIL_CONFIGURED = Boolean(SMTP_HOST && SMTP_FROM);
@@ -45,11 +49,12 @@ function getTransporter() {
   return transporter;
 }
 
-export async function sendEmail(params: { to: string; subject: string; text: string }): Promise<EmailResult> {
+export async function sendEmail(params: { to: string; subject: string; text: string; cc?: string }): Promise<EmailResult> {
   const t = getTransporter();
+  const cc = [SMTP_CC, params.cc].filter(Boolean).join(", ") || undefined;
 
   if (!t) {
-    console.log(`[email-simulado] Para: ${params.to}\nAsunto: ${params.subject}\n${params.text}\n`);
+    console.log(`[email-simulado] Para: ${params.to}${cc ? ` · Copia: ${cc}` : ""}\nAsunto: ${params.subject}\n${params.text}\n`);
     return { estado: "SIMULADO" };
   }
 
@@ -58,6 +63,7 @@ export async function sendEmail(params: { to: string; subject: string; text: str
       from: SMTP_FROM,
       replyTo: SMTP_REPLY_TO || undefined,
       to: params.to,
+      cc,
       subject: params.subject,
       text: params.text,
     });
