@@ -98,12 +98,8 @@ export default function NotificationBell() {
     setErrorPush(null);
 
     if (esIOS && !esStandalone) {
-      // Diagnóstico temporal: esto no debería pasar si ya se ha abierto desde
-      // el icono de la pantalla de inicio — lo mostramos para saber por qué
-      // iOS no lo está reconociendo como "instalada" en este caso concreto.
-      const diag = `standalone(CSS)=${window.matchMedia?.("(display-mode: standalone)").matches} · navigator.standalone=${(navigator as any).standalone} · UA=${navigator.userAgent.slice(0, 60)}`;
       setErrorPush(
-        `En iPhone/iPad, primero añade Admira Trace a la pantalla de inicio: toca "Compartir" y luego "Añadir a pantalla de inicio", y ábrela desde ahí para poder activar las notificaciones.\n\n[diagnóstico: ${diag}]`
+        'En iPhone/iPad, primero añade Admira Trace a la pantalla de inicio: toca "Compartir" y luego "Añadir a pantalla de inicio", y ábrela desde ahí para poder activar las notificaciones.'
       );
       return;
     }
@@ -194,7 +190,7 @@ export default function NotificationBell() {
               >
                 {activandoPush ? "Activando…" : "🔔 Activar notificaciones"}
               </button>
-              {errorPush && <p className="text-[11px] text-amber-900 mt-1.5 whitespace-pre-wrap">{errorPush}</p>}
+              {errorPush && <p className="text-[11px] text-amber-900 mt-1.5">{errorPush}</p>}
             </div>
           )}
 
