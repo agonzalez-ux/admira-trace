@@ -435,11 +435,13 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] text-sky-800 mb-1">Dimensiones del bulto (cm)</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <input type="number" min={0} placeholder="Largo" value={datosTransporte.bultoLargoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoLargoCm: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
-                    <input type="number" min={0} placeholder="Ancho" value={datosTransporte.bultoAnchoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoAnchoCm: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
-                    <input type="number" min={0} placeholder="Alto" value={datosTransporte.bultoAltoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoAltoCm: e.target.value }))} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+                  <label className="block text-[11px] text-sky-800 mb-1">Dimensiones del bulto, en cm (no importa el orden)</label>
+                  <div className="flex items-center gap-1.5">
+                    <input type="number" min={0} placeholder="—" value={datosTransporte.bultoLargoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoLargoCm: e.target.value }))} className="w-full min-w-0 rounded-lg border border-sky-300 px-2 py-1.5 text-sm text-center" />
+                    <span className="text-sky-700 shrink-0">×</span>
+                    <input type="number" min={0} placeholder="—" value={datosTransporte.bultoAnchoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoAnchoCm: e.target.value }))} className="w-full min-w-0 rounded-lg border border-sky-300 px-2 py-1.5 text-sm text-center" />
+                    <span className="text-sky-700 shrink-0">×</span>
+                    <input type="number" min={0} placeholder="—" value={datosTransporte.bultoAltoCm} onChange={(e) => setDatosTransporte((d) => ({ ...d, bultoAltoCm: e.target.value }))} className="w-full min-w-0 rounded-lg border border-sky-300 px-2 py-1.5 text-sm text-center" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

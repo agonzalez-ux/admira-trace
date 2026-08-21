@@ -437,11 +437,13 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
             </div>
           </div>
           <div>
-            <label className="block text-[11px] text-sky-800 mb-1">Dimensiones del bulto (cm)</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <input type="number" min={0} placeholder="Largo" value={bultoLargoCm} onChange={(e) => setBultoLargoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
-              <input type="number" min={0} placeholder="Ancho" value={bultoAnchoCm} onChange={(e) => setBultoAnchoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
-              <input type="number" min={0} placeholder="Alto" value={bultoAltoCm} onChange={(e) => setBultoAltoCm(e.target.value)} className="w-full rounded-lg border border-sky-300 px-2 py-1.5 text-sm" />
+            <label className="block text-[11px] text-sky-800 mb-1">Dimensiones del bulto, en cm (no importa el orden)</label>
+            <div className="flex items-center gap-1.5">
+              <input type="number" min={0} placeholder="—" value={bultoLargoCm} onChange={(e) => setBultoLargoCm(e.target.value)} className="w-full min-w-0 rounded-lg border border-sky-300 px-2 py-1.5 text-sm text-center" />
+              <span className="text-sky-700 shrink-0">×</span>
+              <input type="number" min={0} placeholder="—" value={bultoAnchoCm} onChange={(e) => setBultoAnchoCm(e.target.value)} className="w-full min-w-0 rounded-lg border border-sky-300 px-2 py-1.5 text-sm text-center" />
+              <span className="text-sky-700 shrink-0">×</span>
+              <input type="number" min={0} placeholder="—" value={bultoAltoCm} onChange={(e) => setBultoAltoCm(e.target.value)} className="w-full min-w-0 rounded-lg border border-sky-300 px-2 py-1.5 text-sm text-center" />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
