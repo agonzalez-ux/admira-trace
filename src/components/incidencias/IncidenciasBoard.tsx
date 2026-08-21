@@ -355,7 +355,16 @@ function EstadoUltimaSync({ ultimaSync }: { ultimaSync: UltimaSincronizacion }) 
   );
 }
 
-export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" }) {
+export default function IncidenciasBoard({
+  role,
+  modo = "GENERAL",
+}: {
+  role: "TECNICO" | "ADMIRA";
+  // "INSTALACIONES": solo instalaciones nuevas (su propia pestaña, aparte).
+  // "GENERAL": todo lo demás (reparaciones, mantenimiento...) — las
+  // instalaciones nuevas no se repiten aquí para no verlas duplicadas.
+  modo?: "GENERAL" | "INSTALACIONES";
+}) {
   const [incidencias, setIncidencias] = useState<Incidencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
@@ -464,8 +473,11 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
 
   if (loading) return <p className="text-sm text-slate-400 py-4">Cargando incidencias…</p>;
 
-  const sinAsignar = incidencias.filter((i) => i.estado === "SIN_ASIGNAR");
-  const asignadas = incidencias.filter((i) => i.estado !== "SIN_ASIGNAR");
+  const incidenciasDelModo = incidencias.filter((i) =>
+    modo === "INSTALACIONES" ? i.tipo === "INSTALACION_NUEVA" : i.tipo !== "INSTALACION_NUEVA"
+  );
+  const sinAsignar = incidenciasDelModo.filter((i) => i.estado === "SIN_ASIGNAR");
+  const asignadas = incidenciasDelModo.filter((i) => i.estado !== "SIN_ASIGNAR");
 
   // Para el técnico no hay bandeja "sin asignar": solo ve las suyas ya asignadas.
   const listaBase = role === "ADMIRA" ? (vista === "SIN_ASIGNAR" ? sinAsignar : asignadas) : asignadas;
@@ -511,16 +523,21 @@ export default function IncidenciasBoard({ role }: { role: "TECNICO" | "ADMIRA" 
                 Asignadas ({asignadas.length})
               </button>
             </div>
-            <div className="flex flex-col items-end gap-0.5">
-              <button
-                onClick={sincronizarDesk}
-                disabled={sincronizando}
-                className="text-xs font-medium bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-2 disabled:opacity-60"
-              >
-                {sincronizando ? "Sincronizando…" : "🔄 Sincronizar con el desk ahora"}
-              </button>
-              <EstadoUltimaSync ultimaSync={ultimaSync} />
-            </div>
+            {/* La sincronización con el desk es una sola acción global — con
+                dos pestañas (Incidencias/Instalaciones) mostrando el mismo
+                botón sería confuso, así que solo vive en la pestaña general. */}
+            {modo === "GENERAL" && (
+              <div className="flex flex-col items-end gap-0.5">
+                <button
+                  onClick={sincronizarDesk}
+                  disabled={sincronizando}
+                  className="text-xs font-medium bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-2 disabled:opacity-60"
+                >
+                  {sincronizando ? "Sincronizando…" : "🔄 Sincronizar con el desk ahora"}
+                </button>
+                <EstadoUltimaSync ultimaSync={ultimaSync} />
+              </div>
+            )}
           </div>
 
           <input

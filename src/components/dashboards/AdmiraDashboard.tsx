@@ -12,68 +12,79 @@ import IncidenciaCreateForm from "@/components/incidencias/IncidenciaCreateForm"
 import ExportButtons from "@/components/ExportButtons";
 import TecnicosList from "@/components/tecnicos/TecnicosList";
 import CleanupPanel from "@/components/admin/CleanupPanel";
+import { useProyecto } from "@/lib/proyectoContext";
 
 export default function AdmiraDashboard() {
+  const { proyecto } = useProyecto();
   const [materialKey, setMaterialKey] = useState(0);
   const [envioKey, setEnvioKey] = useState(0);
   const [incidenciaKey, setIncidenciaKey] = useState(0);
 
-  return (
-    <Tabs
-      tabs={[
-        {
-          key: "material",
-          label: "Material",
-          content: (
-            <div className="space-y-4">
-              <MaterialCreateForm almacen="Admira" onCreated={() => setMaterialKey((k) => k + 1)} />
-              <MaterialOverview key={materialKey} />
-            </div>
-          ),
-        },
-        {
-          key: "envios",
-          label: "Envíos y recogidas",
-          content: (
-            <div className="space-y-4">
-              <EnvioCreateForm onCreated={() => setEnvioKey((k) => k + 1)} />
-              <EnviosBoard key={envioKey} role="ADMIRA" />
-            </div>
-          ),
-        },
-        {
-          key: "incidencias",
-          label: "Incidencias",
-          content: (
-            <div className="space-y-4">
-              <IncidenciaCreateForm onCreated={() => setIncidenciaKey((k) => k + 1)} />
-              <IncidenciasBoard key={incidenciaKey} role="ADMIRA" />
-            </div>
-          ),
-        },
-        { key: "tecnicos", label: "Técnicos", content: <TecnicosList /> },
-        {
-          key: "importar",
-          label: "Importar",
-          content: (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-900">
-                  ℹ️ Accede a <Link href="/admira/importar-datos" className="font-semibold underline hover:text-blue-700">
-                    la página de importación completa
-                  </Link> para subir archivos Excel de comerciales e instalaciones.
-                </p>
-              </div>
-            </div>
-          ),
-        },
-        { key: "export", label: "Exportar", content: <ExportButtons /> },
-        {
-          key: "mantenimiento",
-          label: "🔧 Mantenimiento",
-          content: <CleanupPanel />,
-        },
-      ]}
-    />
-  );
+  // El stock de material y las instalaciones solo se gestionan en Altadis
+  // Península — en el resto de proyectos ni se lleva inventario propio ni se
+  // hacen instalaciones nuevas por este canal, así que esas dos pestañas
+  // desaparecen fuera de Península en vez de mostrarse vacías.
+  const esPeninsula = proyecto === "PENINSULA";
+
+  const tabs = [
+    esPeninsula && {
+      key: "material",
+      label: "Material",
+      content: (
+        <div className="space-y-4">
+          <MaterialCreateForm almacen="Admira" onCreated={() => setMaterialKey((k) => k + 1)} />
+          <MaterialOverview key={materialKey} />
+        </div>
+      ),
+    },
+    {
+      key: "envios",
+      label: "Envíos y recogidas",
+      content: (
+        <div className="space-y-4">
+          <EnvioCreateForm onCreated={() => setEnvioKey((k) => k + 1)} />
+          <EnviosBoard key={envioKey} role="ADMIRA" />
+        </div>
+      ),
+    },
+    {
+      key: "incidencias",
+      label: "Incidencias",
+      content: (
+        <div className="space-y-4">
+          <IncidenciaCreateForm onCreated={() => setIncidenciaKey((k) => k + 1)} />
+          <IncidenciasBoard key={incidenciaKey} role="ADMIRA" modo="GENERAL" />
+        </div>
+      ),
+    },
+    esPeninsula && {
+      key: "instalaciones",
+      label: "Instalaciones",
+      content: <IncidenciasBoard key={incidenciaKey} role="ADMIRA" modo="INSTALACIONES" />,
+    },
+    { key: "tecnicos", label: "Técnicos", content: <TecnicosList /> },
+    {
+      key: "importar",
+      label: "Importar",
+      content: (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-900">
+              ℹ️ Accede a <Link href="/admira/importar-datos" className="font-semibold underline hover:text-blue-700">
+                la página de importación completa
+              </Link> para subir archivos Excel de comerciales e instalaciones.
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    { key: "export", label: "Exportar", content: <ExportButtons /> },
+    {
+      key: "mantenimiento",
+      label: "🔧 Mantenimiento",
+      content: <CleanupPanel />,
+    },
+  ].filter(Boolean) as { key: string; label: string; content: React.ReactNode }[];
+
+  return <Tabs tabs={tabs} />;
 }
