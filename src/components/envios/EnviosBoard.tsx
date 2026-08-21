@@ -10,6 +10,7 @@ import {
   TIPO_BULTO_LABELS,
 } from "@/lib/constants";
 import { parsePedido, etiquetaPedido, etiquetaTipoMovimiento, origenRolFor, destinoRolFor } from "@/lib/envioLabel";
+import { direccionAlmacen } from "@/lib/transportistas";
 import { etiquetaTipo } from "@/lib/materialLabel";
 
 const GLS_PORTAL_URL = process.env.NEXT_PUBLIC_GLS_PORTAL_URL || "";
@@ -348,7 +349,22 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
                   <button
                     onClick={() => {
                       setRellenandoId(envio.id);
-                      setDatosTransporte(DATOS_TRANSPORTE_VACIOS);
+                      // Si el origen o el destino es un almacén propio (no un
+                      // técnico), ya sabemos su dirección — se precarga y se
+                      // puede corregir a mano si hiciera falta.
+                      const origenRol = origenRolFor(envio);
+                      const destinoRol = destinoRolFor(envio);
+                      const recogida =
+                        origenRol === "FDM" || origenRol === "ADMIRA" ? direccionAlmacen(origenRol) : null;
+                      const entrega =
+                        destinoRol === "FDM" || destinoRol === "ADMIRA" ? direccionAlmacen(destinoRol) : null;
+                      setDatosTransporte({
+                        ...DATOS_TRANSPORTE_VACIOS,
+                        direccionRecogida: recogida?.direccion || "",
+                        ciudadRecogida: recogida?.ciudad || "",
+                        direccionEntrega: entrega?.direccion || "",
+                        ciudadEntrega: entrega?.ciudad || "",
+                      });
                     }}
                     className="bg-sky-600 text-white text-xs font-medium rounded-lg px-3 py-2 whitespace-nowrap"
                   >

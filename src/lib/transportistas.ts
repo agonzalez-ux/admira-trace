@@ -14,10 +14,12 @@ const RENUS_EMAIL = process.env.RENUS_EMAIL || "";
 // componentes de cliente (EnvioCreateForm, EnviosBoard) — no es un dato
 // sensible, es la URL pública del portal de GLS.
 const GLS_PORTAL_URL = process.env.NEXT_PUBLIC_GLS_PORTAL_URL || "";
-const DIRECCION_ALMACEN_FDM = process.env.DIRECCION_ALMACEN_FDM || "";
-const CIUDAD_ALMACEN_FDM = process.env.CIUDAD_ALMACEN_FDM || "";
-const DIRECCION_ALMACEN_ADMIRA = process.env.DIRECCION_ALMACEN_ADMIRA || "";
-const CIUDAD_ALMACEN_ADMIRA = process.env.CIUDAD_ALMACEN_ADMIRA || "";
+// También con NEXT_PUBLIC_ — sirven para autocompletar los formularios de
+// envío en el cliente (dirección pública del almacén, no es un dato sensible).
+const DIRECCION_ALMACEN_FDM = process.env.NEXT_PUBLIC_DIRECCION_ALMACEN_FDM || "";
+const CIUDAD_ALMACEN_FDM = process.env.NEXT_PUBLIC_CIUDAD_ALMACEN_FDM || "";
+const DIRECCION_ALMACEN_ADMIRA = process.env.NEXT_PUBLIC_DIRECCION_ALMACEN_ADMIRA || "";
+const CIUDAD_ALMACEN_ADMIRA = process.env.NEXT_PUBLIC_CIUDAD_ALMACEN_ADMIRA || "";
 
 export function emailTransportista(transportista: string): string | null {
   if (transportista === "MARESA") return MARESA_EMAIL || null;

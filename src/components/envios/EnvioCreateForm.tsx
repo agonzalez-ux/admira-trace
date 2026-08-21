@@ -12,7 +12,8 @@ import {
   TIPOS_BULTO,
   TIPO_BULTO_LABELS,
 } from "@/lib/constants";
-import { TIPOS_MOVIMIENTO, origenRolFor, type TipoMovimientoId } from "@/lib/envioLabel";
+import { TIPOS_MOVIMIENTO, origenRolFor, almacenOpuesto, type TipoMovimientoId } from "@/lib/envioLabel";
+import { direccionAlmacen } from "@/lib/transportistas";
 import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 
 const GLS_PORTAL_URL = process.env.NEXT_PUBLIC_GLS_PORTAL_URL || "";
@@ -81,6 +82,28 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     setOtros([]);
     setDisponibles({});
     setTecnicoId("");
+
+    // El almacén de origen conoce su propia dirección — se precarga para no
+    // tener que volver a escribirla en cada envío (se puede corregir a mano
+    // si hiciera falta). El resto de direcciones dependen de a quién se
+    // envía y no se pueden adivinar aquí.
+    const cfg = TIPOS_MOVIMIENTO.find((m) => m.id === movimiento)!;
+    if (cfg.tipo !== "RECOGIDA") {
+      const { direccion, ciudad } = direccionAlmacen(cfg.almacen);
+      setDireccionRecogida(direccion);
+      setCiudadRecogida(ciudad);
+    } else {
+      setDireccionRecogida("");
+      setCiudadRecogida("");
+    }
+    if (cfg.tipo === "TRANSFERENCIA") {
+      const { direccion, ciudad } = direccionAlmacen(almacenOpuesto(cfg.almacen));
+      setDireccionEntrega(direccion);
+      setCiudadEntrega(ciudad);
+    } else {
+      setDireccionEntrega("");
+      setCiudadEntrega("");
+    }
   }, [movimiento]);
 
   useEffect(() => {
@@ -195,10 +218,8 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
     setBultoAltoCm("");
     setBultoPesoKg("");
     setDetalleTransporte("");
-    setCiudadRecogida("");
-    setDireccionRecogida("");
-    setCiudadEntrega("");
-    setDireccionEntrega("");
+    // Las direcciones de almacén (recogida/entrega) NO se limpian — son la
+    // dirección conocida del almacén, útil para el siguiente envío igual.
     onCreated();
   }
 
