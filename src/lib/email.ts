@@ -1,17 +1,14 @@
 import nodemailer from "nodemailer";
 
 /**
- * Envío de correo por el relay SMTP de Google Workspace.
+ * Envío de correo — vía SMTP genérico (nodemailer), sea el relay de Google
+ * Workspace o Amazon SES; solo cambian las variables de entorno, no este
+ * código. Ver los comentarios de las variables SMTP_* en `.env`.
  *
- * `soporte.altadis@admira.com` es un GRUPO, no una cuenta: no tiene contraseña
- * y no puede autenticarse. El relay de Workspace (smtp-relay.gmail.com) está
- * pensado justo para esto — permite que una aplicación envíe como cualquier
- * dirección del dominio.
- *
- * Admite las dos formas de autorización que ofrece el relay:
- *  - Por IP: el admin autoriza la IP del servidor y no hacen falta credenciales.
- *  - Con cuenta: se autentica con un usuario real, pero el remitente sigue
- *    siendo el grupo (SMTP_FROM es independiente de SMTP_USER).
+ * El remitente real (SMTP_FROM) es `altadis.soporte@admira.com`. El grupo
+ * antiguo `soporte.altadis@admira.com` (sin contraseña propia, no puede
+ * autenticarse) ya no es el remitente, pero sigue en copia en todos los
+ * correos vía SMTP_CC.
  *
  * Sin configurar, el envío se *simula* (queda como "SIMULADO") para que el
  * resto de la app siga funcionando con normalidad.
