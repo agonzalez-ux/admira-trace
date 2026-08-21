@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const envios = await prisma.envio.findMany({
     where,
     include: {
-      tecnico: { select: { id: true, name: true, zona: true } },
+      tecnico: { select: { id: true, name: true, zona: true, direccion: true } },
       creadoPor: { select: { name: true } },
       items: { include: { material: true } },
     },

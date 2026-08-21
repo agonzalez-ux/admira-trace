@@ -18,7 +18,7 @@ import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 
 const GLS_PORTAL_URL = process.env.NEXT_PUBLIC_GLS_PORTAL_URL || "";
 
-type Tecnico = { id: string; name: string; zona: string | null };
+type Tecnico = { id: string; name: string; zona: string | null; direccion: string | null };
 type Material = { id: string; tipo: string };
 type LineaOtro = { descripcion: string; cantidad: number };
 
@@ -105,6 +105,17 @@ export default function EnvioCreateForm({ onCreated }: { onCreated: () => void }
       setCiudadEntrega("");
     }
   }, [movimiento]);
+
+  // Al elegir el técnico de un envío (destino), se conoce su dirección —
+  // se precarga igual que la del almacén de origen (editable, por si el
+  // envío va a otra dirección puntual y no a la habitual del técnico).
+  useEffect(() => {
+    if (config.tipo !== "ENVIO" || !tecnicoId) return;
+    const t = tecnicos.find((x) => x.id === tecnicoId);
+    if (!t) return;
+    setDireccionEntrega(t.direccion || "");
+    setCiudadEntrega(t.zona || "");
+  }, [tecnicoId, tecnicos, config.tipo]);
 
   useEffect(() => {
     async function cargarDisponibles() {

@@ -42,7 +42,7 @@ type Envio = {
   esRecurrente: boolean;
   notas: string | null;
   fechaCreacion: string;
-  tecnico: { id: string; name: string; zona: string | null } | null;
+  tecnico: { id: string; name: string; zona: string | null; direccion: string | null } | null;
   creadoPor?: { name: string };
   items: EnvioItem[];
   emailTransportistaEstado: string | null;
@@ -355,9 +355,17 @@ export default function EnviosBoard({ role }: { role: "FDM" | "TECNICO" | "ADMIR
                       const origenRol = origenRolFor(envio);
                       const destinoRol = destinoRolFor(envio);
                       const recogida =
-                        origenRol === "FDM" || origenRol === "ADMIRA" ? direccionAlmacen(origenRol) : null;
+                        origenRol === "FDM" || origenRol === "ADMIRA"
+                          ? direccionAlmacen(origenRol)
+                          : origenRol === "TECNICO" && envio.tecnico
+                            ? { direccion: envio.tecnico.direccion || "", ciudad: envio.tecnico.zona || "" }
+                            : null;
                       const entrega =
-                        destinoRol === "FDM" || destinoRol === "ADMIRA" ? direccionAlmacen(destinoRol) : null;
+                        destinoRol === "FDM" || destinoRol === "ADMIRA"
+                          ? direccionAlmacen(destinoRol)
+                          : destinoRol === "TECNICO" && envio.tecnico
+                            ? { direccion: envio.tecnico.direccion || "", ciudad: envio.tecnico.zona || "" }
+                            : null;
                       setDatosTransporte({
                         ...DATOS_TRANSPORTE_VACIOS,
                         direccionRecogida: recogida?.direccion || "",
