@@ -36,6 +36,7 @@ model Estanco {
   updatedAt          DateTime @updatedAt
 
   incidencias Incidencia[]
+  materialesInstalados Material[]
 }
 
 // Rol: TECNICO | ADMIRA | FDM
@@ -149,6 +150,12 @@ model Material {
   tecnicoId    String?
   tecnico      User?    @relation("MaterialTecnico", fields: [tecnicoId], references: [id])
   ubicacion    String?
+  // Solo tiene sentido cuando estado = INSTALADO. Se rellena directamente al
+  // instalarlo (ver POST /api/incidencias/[id]/material) — no depende de que
+  // exista la incidencia para poder consultarlo rápido. El histórico previo
+  // a este campo se ha rellenado aparte con scripts/backfill-estanco-instalado.ts.
+  estancoInstaladoId String?
+  estancoInstalado   Estanco? @relation(fields: [estancoInstaladoId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

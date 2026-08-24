@@ -32,7 +32,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     include: { material: true },
   });
 
-  await prisma.material.update({ where: { id: material.id }, data: { estado: "INSTALADO" } });
+  await prisma.material.update({
+    where: { id: material.id },
+    data: { estado: "INSTALADO", estancoInstaladoId: incidencia.estancoId },
+  });
 
   await prisma.materialEvento.create({
     data: {

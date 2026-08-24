@@ -27,19 +27,23 @@ export async function GET(req: NextRequest) {
 
   const materiales = await prisma.material.findMany({
     where,
-    include: { tecnico: { select: { id: true, name: true, zona: true } } },
+    include: {
+      tecnico: { select: { id: true, name: true, zona: true } },
+      estancoInstalado: { select: { id: true, nombre: true, municipio: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
-  // El material no guarda directamente dónde está instalado — se sabe a
-  // través de la incidencia en la que un técnico lo registró como instalado
-  // (ver POST /api/incidencias/[id]/material). Se busca aparte, y solo para
-  // el subconjunto ya instalado, para no cargar este join en cada material.
-  const idsInstalados = materiales.filter((m) => m.estado === "INSTALADO").map((m) => m.id);
+  // `estancoInstaladoId` se rellena directamente al instalar (ver POST
+  // /api/incidencias/[id]/material) y con el backfill del histórico
+  // (scripts/backfill-estanco-instalado.ts). Como red de seguridad, para lo
+  // que aun así se quede sin ese campo (instalado antes de que existiera y
+  // sin backfillear) se busca vía la incidencia donde se registró.
+  const sinCampoDirecto = materiales.filter((m) => m.estado === "INSTALADO" && !m.estancoInstalado).map((m) => m.id);
   const estancoPorMaterial = new Map<string, { id: string; nombre: string; municipio: string | null }>();
-  if (idsInstalados.length > 0) {
+  if (sinCampoDirecto.length > 0) {
     const usos = await prisma.incidenciaMaterial.findMany({
-      where: { materialId: { in: idsInstalados } },
+      where: { materialId: { in: sinCampoDirecto } },
       orderBy: { fecha: "desc" },
       include: { incidencia: { select: { estanco: { select: { id: true, nombre: true, municipio: true } } } } },
     });
@@ -54,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   const resultado = materiales.map((m) => ({
     ...m,
-    estancoInstalado: estancoPorMaterial.get(m.id) || null,
+    estancoInstalado: m.estancoInstalado || estancoPorMaterial.get(m.id) || null,
   }));
 
   return NextResponse.json({ materiales: resultado });
