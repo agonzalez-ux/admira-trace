@@ -123,5 +123,9 @@ export function getDocumentSpreadsheetId(key: DocumentKey): string | undefined {
 
 export function getDocumentUrl(key: DocumentKey): string | null {
   const id = getDocumentSpreadsheetId(key);
-  return id ? `https://docs.google.com/spreadsheets/d/${id}/edit` : null;
+  if (!id) return null;
+  // "materiales" (STOCK) es un .xlsx real subido a Drive, no una Hoja de
+  // Google nativa — el enlace de "abrir" tiene que ser el de Drive.
+  if (key === "materiales") return `https://drive.google.com/file/d/${id}/view`;
+  return `https://docs.google.com/spreadsheets/d/${id}/edit`;
 }

@@ -41,7 +41,11 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const incluirEstancos = Boolean(body?.incluirEstancos);
 
-  await syncToSheets(["materiales", "envios", "incidencias", "tecnicos", "intervenciones", "censo"]);
+  // "Sincronizar ahora" es una acción explícita: fuerza también STOCK (que
+  // normalmente respeta un límite de 20 min por el coste de reescribir el .xlsx).
+  await syncToSheets(["materiales", "envios", "incidencias", "tecnicos", "intervenciones", "censo"], {
+    forceMateriales: true,
+  });
   if (incluirEstancos) {
     await syncToSheets("estancos", { forceEstancos: true });
   }

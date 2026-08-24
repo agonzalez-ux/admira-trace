@@ -1,15 +1,15 @@
 import { google } from "googleapis";
+import ExcelJS from "exceljs";
+import { Readable } from "stream";
 import { prisma } from "./prisma";
 import {
-  ESTADO_MATERIAL_LABELS,
   ESTADO_ENVIO_LABELS,
   ESTADO_INCIDENCIA_LABELS,
-  TIPO_MATERIAL_LABELS,
   TIPO_INCIDENCIA_LABELS,
   PROYECTO_LABELS,
 } from "./constants";
 import { DOCUMENTOS, DocumentKey, getDocumentSpreadsheetId, getDocumentUrl } from "./documentSheets";
-import { etiquetaTipo, etiquetaOrigenIncidencia } from "./materialLabel";
+import { etiquetaOrigenIncidencia } from "./materialLabel";
 
 // "Libro combinado": sigue existiendo para las 2 pestañas que no tienen un
 // documento real propio (Envíos y Técnicos). Los 5 documentos reales viven
@@ -46,6 +46,25 @@ function getClient() {
 
   sheetsClient = google.sheets({ version: "v4", auth });
   return sheetsClient;
+}
+
+// Solo lo necesita "materiales" (STOCK): es un .xlsx real subido a Drive, no
+// una Hoja de Google nativa, así que no vale la API de Sheets — hay que
+// descargar/subir el archivo entero con la API de Drive.
+let driveClient: ReturnType<typeof google.drive> | null = null;
+
+function getDriveClient() {
+  if (!CLIENT_EMAIL || !PRIVATE_KEY) return null;
+  if (driveClient) return driveClient;
+
+  const auth = new google.auth.JWT({
+    email: CLIENT_EMAIL,
+    key: PRIVATE_KEY,
+    scopes: ["https://www.googleapis.com/auth/drive"],
+  });
+
+  driveClient = google.drive({ version: "v3", auth });
+  return driveClient;
 }
 
 // --- Utilidades genéricas, parametrizadas por spreadsheetId ---------------
@@ -166,26 +185,82 @@ function target(key: SheetsSection): { spreadsheetId: string | undefined; tab: s
   return { spreadsheetId: getDocumentSpreadsheetId(docKey), tab: DOCUMENTOS[docKey].dataTab };
 }
 
-async function syncMateriales() {
-  const materiales = await prisma.material.findMany({ include: { tecnico: true }, orderBy: { createdAt: "desc" } });
-  const t = target("materiales");
-  await writeSheet(
-    t.spreadsheetId,
-    t.tab,
-    ["Número de serie", "Tipo", "Nombre", "IMEI", "Proyecto", "Estado", "Técnico actual", "Zona", "Creado", "Actualizado"],
-    materiales.map((m) => [
-      m.numeroSerie,
-      etiquetaTipo(m),
-      m.nombre,
-      m.imei || "",
-      m.proyecto ? PROYECTO_LABELS[m.proyecto as keyof typeof PROYECTO_LABELS] || m.proyecto : "",
-      ESTADO_MATERIAL_LABELS[m.estado as keyof typeof ESTADO_MATERIAL_LABELS] || m.estado,
-      m.tecnico?.name || "",
-      m.tecnico?.zona || "",
-      m.createdAt.toLocaleString("es-ES"),
-      m.updatedAt.toLocaleString("es-ES"),
-    ])
-  );
+// "STOCK PANTALLAS FASE 5 AGOSTO 2026" es un .xlsx real subido a Drive (no una
+// Hoja de Google nativa): no se puede escribir celda a celda con la API de
+// Sheets, hay que descargar el archivo entero, editar solo lo que la app
+// gestiona con ExcelJS, y volver a subirlo completo con la API de Drive. Por
+// el coste de esa operación (archivo de ~3MB, 20 pestañas) se limita a como
+// mucho una vez cada 20 minutos, igual que "estancos"; el botón manual la
+// salta. Solo se tocan filas YA EXISTENTES en la pestaña "STOCK", localizadas
+// por "*SERIAL NUMBER" (columna B) — nunca se añaden filas nuevas, porque la
+// app no tiene datos de EMISOR/MARCA/Modelo para crear una fila con sentido.
+// El resto de columnas de esa pestaña y las otras 19 pestañas del archivo
+// quedan intactas (comprobado: una ida-vuelta con ExcelJS sin cambios
+// reproduce el archivo con las mismas ~82.000 validaciones, fórmulas,
+// colores y valores — solo cambia metadata interna irrelevante).
+let lastMaterialesSyncAt = 0;
+const MATERIALES_MIN_INTERVAL_MS = 20 * 60 * 1000;
+
+const STOCK_COLUMNAS = {
+  serie: 2, // *SERIAL NUMBER
+  instalada: 7, // *INSTALADA
+  estancoActual: 8, // *Estanco Actual
+  tecnico: 9, // *TECNICO
+  proyecto: 10, // *PROYECTO
+  provinciaTecnico: 11, // *Provincia Técnico
+  actualizacionTecnico: 12, // Actualización técnico
+} as const;
+
+async function syncMateriales(force = false) {
+  const now = Date.now();
+  if (!force && now - lastMaterialesSyncAt < MATERIALES_MIN_INTERVAL_MS) return;
+  lastMaterialesSyncAt = now;
+
+  const drive = getDriveClient();
+  const fileId = getDocumentSpreadsheetId("materiales");
+  if (!drive || !fileId) return;
+
+  const materiales = await prisma.material.findMany({ include: { tecnico: true, estancoInstalado: true } });
+  if (materiales.length === 0) return;
+  const porSerie = new Map(materiales.map((m) => [m.numeroSerie.trim(), m]));
+
+  const descarga = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+  const wb = new ExcelJS.Workbook();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- desajuste de tipos entre exceljs y los tipos de Buffer de Node
+  await wb.xlsx.load(Buffer.from(descarga.data as ArrayBuffer) as any);
+  const ws = wb.getWorksheet("STOCK");
+  if (!ws) return;
+
+  let actualizados = 0;
+  for (let r = 2; r <= ws.rowCount; r++) {
+    const fila = ws.getRow(r);
+    const serie = fila.getCell(STOCK_COLUMNAS.serie).value;
+    if (!serie) continue;
+    const m = porSerie.get(String(serie).trim());
+    if (!m) continue;
+
+    fila.getCell(STOCK_COLUMNAS.instalada).value = m.estado === "INSTALADO" ? "SI" : "";
+    fila.getCell(STOCK_COLUMNAS.estancoActual).value = m.estancoInstalado?.nombre || "";
+    fila.getCell(STOCK_COLUMNAS.tecnico).value = m.tecnico?.name || "";
+    fila.getCell(STOCK_COLUMNAS.proyecto).value = m.proyecto
+      ? PROYECTO_LABELS[m.proyecto as keyof typeof PROYECTO_LABELS] || m.proyecto
+      : "";
+    fila.getCell(STOCK_COLUMNAS.provinciaTecnico).value = m.tecnico?.zona || "";
+    fila.getCell(STOCK_COLUMNAS.actualizacionTecnico).value = m.updatedAt;
+    actualizados++;
+  }
+
+  if (actualizados === 0) return; // ningún número de serie coincidía; no hace falta volver a subir el archivo
+
+  const outBuffer = await wb.xlsx.writeBuffer();
+  await drive.files.update({
+    fileId,
+    media: {
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      body: Readable.from(Buffer.from(outBuffer)),
+    },
+  });
+  console.log(`[google-sheets] STOCK actualizado: ${actualizados} de ${materiales.length} materiales localizados por número de serie.`);
 }
 
 async function syncEnvios() {
@@ -313,21 +388,37 @@ async function syncVistasFiltradasIncidencias(incidencias: Parameters<typeof fil
   const pendienteEstanquero = incidencias.filter((i) => contiene(i, "pendiente acción estanquero")).map(filaIncidencia);
   const ok = incidencias.filter((i) => i.estado === "RESUELTA").map(filaIncidencia);
 
-  await writeSheet(spreadsheetId, "Datos crudos Importados", HEADER_INCIDENCIAS, todas);
-  await writeSheet(spreadsheetId, "Cambio de router", HEADER_INCIDENCIAS, cambioRouter);
-  await writeSheet(spreadsheetId, "No contestan", HEADER_INCIDENCIAS, noContestan);
-  await writeSheet(spreadsheetId, "Pendiente acción estanquero", HEADER_INCIDENCIAS, pendienteEstanquero);
-  await writeSheet(spreadsheetId, "TFTs", HEADER_INCIDENCIAS, todas);
-  await writeSheet(spreadsheetId, "TFTs OK", HEADER_INCIDENCIAS, ok);
+  // Cada pestaña se escribe de forma independiente: si una falla (p. ej.
+  // "Datos crudos Importados" está protegida en el documento real y el
+  // servicio no tiene permiso para editarla), las demás no deben quedarse
+  // sin sincronizar por ese motivo.
+  const tandas: [string, (string | number)[][]][] = [
+    ["Datos crudos Importados", todas],
+    ["Cambio de router", cambioRouter],
+    ["No contestan", noContestan],
+    ["Pendiente acción estanquero", pendienteEstanquero],
+    ["TFTs", todas],
+    ["TFTs OK", ok],
+  ];
+  for (const [tab, filas] of tandas) {
+    try {
+      await writeSheet(spreadsheetId, tab, HEADER_INCIDENCIAS, filas);
+    } catch (err) {
+      console.error(`[google-sheets] Error sincronizando la pestaña "${tab}":`, err);
+    }
+  }
 
   const notaSVM = [
     "La app no distingue el formato de hardware (SVM vs TFT) por incidencia, así que esta pestaña se deja " +
       "vacía a propósito en vez de mostrar un dato que podría ser incorrecto.",
   ];
-  await writeSheet(spreadsheetId, "SVM", ["Nota"], [notaSVM]);
-  await writeSheet(spreadsheetId, "SVM-Pendiente acción estanquero", ["Nota"], [notaSVM]);
-  await writeSheet(spreadsheetId, "SVM-No contestan", ["Nota"], [notaSVM]);
-  await writeSheet(spreadsheetId, "SVM OK", ["Nota"], [notaSVM]);
+  for (const tab of ["SVM", "SVM-Pendiente acción estanquero", "SVM-No contestan", "SVM OK"]) {
+    try {
+      await writeSheet(spreadsheetId, tab, ["Nota"], [notaSVM]);
+    } catch (err) {
+      console.error(`[google-sheets] Error sincronizando la pestaña "${tab}":`, err);
+    }
+  }
 }
 
 async function syncTecnicos() {
@@ -635,7 +726,10 @@ export type SheetsSection = keyof typeof SYNCERS;
  * `forceEstancos` salta el límite de frecuencia del directorio de estancos
  * (lo usa el botón manual "Sincronizar ahora").
  */
-export async function syncToSheets(sections: SheetsSection | SheetsSection[], opts?: { forceEstancos?: boolean }) {
+export async function syncToSheets(
+  sections: SheetsSection | SheetsSection[],
+  opts?: { forceEstancos?: boolean; forceMateriales?: boolean }
+) {
   const sheets = getClient();
   if (!sheets) return;
   const list = Array.isArray(sections) ? sections : [sections];
@@ -643,6 +737,7 @@ export async function syncToSheets(sections: SheetsSection | SheetsSection[], op
     list.map(async (s) => {
       try {
         if (s === "estancos") await syncEstancos(opts?.forceEstancos);
+        else if (s === "materiales") await syncMateriales(opts?.forceMateriales);
         else await SYNCERS[s]();
       } catch (err) {
         console.error(`[google-sheets] Error sincronizando "${s}":`, err);
