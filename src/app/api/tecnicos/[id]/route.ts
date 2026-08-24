@@ -24,6 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       radioCobertura: true,
       costeKm: true,
       condiciones: true,
+      esExterno: true,
       createdAt: true,
     },
   });

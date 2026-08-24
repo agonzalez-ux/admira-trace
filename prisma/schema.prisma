@@ -57,6 +57,10 @@ model User {
   radioCobertura    String?
   costeKm           String?
   condiciones       String?
+  // Viene de la pestaña "Externos" de la hoja "New Técnicos" en vez de las
+  // pestañas de técnicos habituales (España/Portugal) — proveedores externos
+  // que no forman parte de la red de técnicos propia.
+  esExterno         Boolean  @default(false)
   // Coordenadas geocodificadas de `direccion` (OpenStreetMap/Nominatim), para
   // calcular la distancia aproximada a cada incidencia.
   lat       Float?

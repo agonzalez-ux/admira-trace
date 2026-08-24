@@ -1,6 +1,10 @@
 /**
- * Importa los técnicos reales desde el Google Sheet "New Técnicos"
- * (hojas "Técnicos España" y "Técnicos Portugal") como cuentas de usuario.
+ * Importa los técnicos reales desde el Google Sheet "New Técnicos" (hojas
+ * "Técnicos España", "Técnicos Portugal" y "Externos") como cuentas de
+ * usuario. Los de "Externos" quedan marcados con esExterno = true — son
+ * proveedores externos (no la red de técnicos habitual), aunque se dan de
+ * alta igual y funcionan exactamente igual (se pueden asignar a cualquier
+ * incidencia), solo se distinguen con un distintivo en el listado.
  *
  * Uso: node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/import-tecnicos.ts
  *
@@ -141,7 +145,15 @@ async function main() {
   const portugal = await leerHoja(sheets, "Técnicos Portugal", 1);
   console.log(`  ${portugal.length} filas`);
 
-  const todas = [...espana, ...portugal];
+  console.log("Leyendo Externos...");
+  const externos = await leerHoja(sheets, "Externos", 0);
+  console.log(`  ${externos.length} filas`);
+
+  const todas = [
+    ...espana.map((f) => ({ f, esExterno: false })),
+    ...portugal.map((f) => ({ f, esExterno: false })),
+    ...externos.map((f) => ({ f, esExterno: true })),
+  ];
   const usados = new Set<string>();
   const credenciales: { nombre: string; username: string; password: string; email: string }[] = [];
 
@@ -149,7 +161,7 @@ async function main() {
   let actualizados = 0;
   let sinEmail = 0;
 
-  for (const f of todas) {
+  for (const { f, esExterno } of todas) {
     const email = primerEmail(f.email);
     if (!email) {
       sinEmail += 1;
@@ -168,6 +180,7 @@ async function main() {
       radioCobertura: f.radioCobertura || null,
       costeKm: f.costeKm || null,
       condiciones: f.condiciones || null,
+      esExterno,
     };
 
     // Se busca por nombre de empresa: es el identificador estable entre

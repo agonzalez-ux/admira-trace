@@ -35,6 +35,7 @@ type Detalle = {
     radioCobertura: string | null;
     costeKm: string | null;
     condiciones: string | null;
+    esExterno: boolean;
   };
   materiales: Material[];
   enviosPendientes: EnvioPendiente[];
@@ -93,7 +94,14 @@ export default function TecnicoFichaModal({ tecnicoId, onClose }: { tecnicoId: s
               <div className="text-slate-400 text-sm">Cargando ficha…</div>
             ) : (
               <>
-                <h2 className="font-bold text-lg text-slate-800">{detalle?.tecnico.name}</h2>
+                <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                  {detalle?.tecnico.name}
+                  {detalle?.tecnico.esExterno && (
+                    <span className="text-[10px] font-normal bg-amber-100 text-amber-700 rounded-full px-2 py-0.5" title="Proveedor externo, no de la red de técnicos habitual">
+                      Externo
+                    </span>
+                  )}
+                </h2>
                 <div className="text-xs text-slate-500">
                   @{detalle?.tecnico.username} {detalle?.tecnico.zona ? `· ${detalle.tecnico.zona}` : ""}
                 </div>

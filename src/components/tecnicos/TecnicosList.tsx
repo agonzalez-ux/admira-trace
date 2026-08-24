@@ -15,6 +15,7 @@ type Tecnico = {
   username: string;
   personaContacto: string | null;
   radioCobertura: string | null;
+  esExterno: boolean;
   numMaterialDisponible: number;
   numIncidenciasPendientes: number;
 };
@@ -116,6 +117,11 @@ export default function TecnicosList() {
             <div className="min-w-0">
               <div className="font-medium text-slate-800 flex items-center gap-2 min-w-0">
                 <span className="truncate">{t.name}</span>
+                {t.esExterno && (
+                  <span className="text-[10px] bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 shrink-0" title="Proveedor externo, no de la red de técnicos habitual">
+                    Externo
+                  </span>
+                )}
                 {hayCoincidenciaDireccion && idx === 0 && (
                   <span className="text-[10px] bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 shrink-0">Más cercano</span>
                 )}

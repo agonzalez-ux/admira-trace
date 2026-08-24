@@ -13,6 +13,7 @@ const SELECT_TECNICO = {
   username: true,
   personaContacto: true,
   radioCobertura: true,
+  esExterno: true,
   materiales: { where: { estado: "EN_TECNICO" }, select: { id: true } },
   incidenciasAsig: { where: { estado: { not: "RESUELTA" } }, select: { id: true } },
 } as const;
@@ -28,6 +29,7 @@ function aResultado(t: any) {
     username: t.username,
     personaContacto: t.personaContacto,
     radioCobertura: t.radioCobertura,
+    esExterno: t.esExterno,
     numMaterialDisponible: t.materiales.length,
     numIncidenciasPendientes: t.incidenciasAsig.length,
   };
