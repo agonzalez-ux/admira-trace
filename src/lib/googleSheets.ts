@@ -436,56 +436,132 @@ async function syncIntervenciones() {
 // limitado a incidencias de tipo instalación nueva. Igual que arriba: los campos que el
 // Excel real trae y la app no gestiona (fechas de aprobación/prevista, facturación, IMEI,
 // datos del comercial…) se dejan en blanco.
+// Convierte un índice de columna (0 = A) a su letra en notación A1,
+// incluyendo columnas de dos letras (26 = AA, 27 = AB...).
+function columnaALetra(indice0: number): string {
+  let n = indice0 + 1;
+  let letra = "";
+  while (n > 0) {
+    const resto = (n - 1) % 26;
+    letra = String.fromCharCode(65 + resto) + letra;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letra;
+}
+
+// "Censo_Pantallas" es el documento real con el histórico de instalaciones
+// (~2.700 filas), con columnas (Frecuencia, ID, Facturación, Pulgadas, IMEI,
+// Nºserie SIM/MiniPC, Seguimiento Admira, datos del comercial...) que la app
+// no gestiona y no debe tocar. A diferencia del resto de secciones, aquí NO
+// se reescribe la pestaña entera: se localiza cada instalación por su "SR"
+// (columna B, coincide con Incidencia.ticketExternoId) y solo se actualizan,
+// celda a celda, las columnas que la app conoce con certeza; el resto de la
+// fila queda intacto. Las instalaciones que aún no estén en la hoja se
+// añaden al final, con solo esas columnas rellenas y el resto en blanco.
+const CENSO_TOTAL_COLUMNAS = 40; // A..AN, según la hoja real
+const CENSO_COLUMNAS_APP = {
+  sr: 1, // B
+  fechaAsignacion: 2, // C
+  estanco: 4, // E
+  direccion: 5, // F
+  codigoPostal: 6, // G
+  provincia: 7, // H
+  estado: 8, // I
+  tipo: 9, // J
+  fechaSolicitud: 10, // K
+  fechaIntervencion: 13, // N
+  instalador: 14, // O
+  serieRouter: 20, // U
+  seriePantalla: 22, // W
+  informacionSolicitud: 27, // AB
+  ultimaActualizacion: 29, // AD
+} as const;
+
 async function syncCenso() {
+  const sheets = getClient();
+  const t = target("censo");
+  if (!sheets || !t.spreadsheetId) return;
+
   const instalaciones = await prisma.incidencia.findMany({
-    where: { tipo: "INSTALACION_NUEVA" },
-    include: { tecnico: true, materialesUsados: { include: { material: true } } },
+    where: { tipo: "INSTALACION_NUEVA", ticketExternoId: { not: null } },
+    include: { tecnico: true, estanco: true, materialesUsados: { include: { material: true } } },
     orderBy: { fechaImportada: "desc" },
   });
-  const t = target("censo");
-  await writeSheet(
-    t.spreadsheetId,
-    t.tab,
-    [
-      "SR",
-      "Fecha Asignación",
-      "Estanco",
-      "Dirección",
-      "Provincia",
-      "Estado",
-      "Tipo",
-      "Fecha de solicitud",
-      "Fecha de Intervención",
-      "Instalador",
-      "Elemento",
-      "Nº Serie Router",
-      "Nº Serie Pantalla",
-      "Información de solicitud",
-      "última actualización",
-    ],
-    instalaciones.map((i) => {
-      const router = i.materialesUsados.find((m) => m.material.tipo === "ROUTER")?.material;
-      const pantalla = i.materialesUsados.find((m) => m.material.tipo === "PANTALLA")?.material;
-      const ultimaActualizacion = i.fechaResuelta || i.fechaEnCamino || i.fechaAsignacion || i.fechaImportada;
-      return [
-        i.ticketExternoId || "",
-        i.fechaAsignacion ? i.fechaAsignacion.toLocaleDateString("es-ES") : "",
-        i.cliente || "",
-        i.direccion || "",
-        i.tecnico?.zona || "",
-        ESTADO_INCIDENCIA_LABELS[i.estado as keyof typeof ESTADO_INCIDENCIA_LABELS] || i.estado,
-        TIPO_INCIDENCIA_LABELS[i.tipo as keyof typeof TIPO_INCIDENCIA_LABELS] || i.tipo,
-        i.fechaImportada.toLocaleDateString("es-ES"),
-        i.fechaResuelta ? i.fechaResuelta.toLocaleDateString("es-ES") : "",
-        i.tecnico?.name || "",
-        i.materialesUsados.map((m) => m.material.numeroSerie).join(", "),
-        router?.numeroSerie || "",
-        pantalla?.numeroSerie || "",
-        i.descripcion || "",
-        ultimaActualizacion.toLocaleString("es-ES"),
-      ];
-    })
-  );
+  if (instalaciones.length === 0) return; // nada que sincronizar todavía
+
+  await ensureTabsExist(t.spreadsheetId, [t.tab]);
+
+  // Localizar la fila de cada SR ya presente en la hoja (columna B desde la fila 4;
+  // las 3 primeras filas son cabecera/rótulo de sección).
+  const colSR = columnaALetra(CENSO_COLUMNAS_APP.sr);
+  const existentes = await sheets.spreadsheets.values.get({
+    spreadsheetId: t.spreadsheetId,
+    range: `${t.tab}!${colSR}4:${colSR}`,
+  });
+  const filaPorSR = new Map<string, number>(); // SR -> nº de fila (1-based)
+  (existentes.data.values || []).forEach((fila, i) => {
+    const sr = fila[0];
+    if (sr) filaPorSR.set(String(sr).trim(), i + 4);
+  });
+
+  const dataUpdates: { range: string; values: (string | number)[][] }[] = [];
+  const filasNuevas: (string | number)[][] = [];
+
+  for (const i of instalaciones) {
+    const sr = i.ticketExternoId!.trim();
+    const router = i.materialesUsados.find((m) => m.material.tipo === "ROUTER")?.material;
+    const pantalla = i.materialesUsados.find((m) => m.material.tipo === "PANTALLA")?.material;
+    const ultimaActualizacion = i.fechaResuelta || i.fechaEnCamino || i.fechaAsignacion || i.fechaImportada;
+
+    const valores: Partial<Record<number, string>> = {
+      [CENSO_COLUMNAS_APP.fechaAsignacion]: i.fechaAsignacion ? i.fechaAsignacion.toLocaleDateString("es-ES") : "",
+      [CENSO_COLUMNAS_APP.estanco]: i.estanco?.nombre || i.cliente || "",
+      [CENSO_COLUMNAS_APP.direccion]: i.estanco?.direccion || i.direccion || "",
+      [CENSO_COLUMNAS_APP.codigoPostal]: i.estanco?.codigoPostal || "",
+      [CENSO_COLUMNAS_APP.provincia]: i.estanco?.provincia || "",
+      [CENSO_COLUMNAS_APP.estado]: ESTADO_INCIDENCIA_LABELS[i.estado as keyof typeof ESTADO_INCIDENCIA_LABELS] || i.estado,
+      [CENSO_COLUMNAS_APP.tipo]: TIPO_INCIDENCIA_LABELS[i.tipo as keyof typeof TIPO_INCIDENCIA_LABELS] || i.tipo,
+      [CENSO_COLUMNAS_APP.fechaSolicitud]: i.fechaImportada.toLocaleDateString("es-ES"),
+      [CENSO_COLUMNAS_APP.fechaIntervencion]: i.fechaResuelta ? i.fechaResuelta.toLocaleDateString("es-ES") : "",
+      [CENSO_COLUMNAS_APP.instalador]: i.tecnico?.name || "",
+      [CENSO_COLUMNAS_APP.serieRouter]: router?.numeroSerie || "",
+      [CENSO_COLUMNAS_APP.seriePantalla]: pantalla?.numeroSerie || "",
+      [CENSO_COLUMNAS_APP.informacionSolicitud]: i.descripcion || "",
+      [CENSO_COLUMNAS_APP.ultimaActualizacion]: ultimaActualizacion.toLocaleString("es-ES"),
+    };
+
+    const filaExistente = filaPorSR.get(sr);
+    if (filaExistente) {
+      for (const [indice, valor] of Object.entries(valores)) {
+        dataUpdates.push({ range: `${t.tab}!${columnaALetra(Number(indice))}${filaExistente}`, values: [[valor as string]] });
+      }
+    } else {
+      const fila: string[] = new Array(CENSO_TOTAL_COLUMNAS).fill("");
+      fila[CENSO_COLUMNAS_APP.sr] = sr;
+      for (const [indice, valor] of Object.entries(valores)) fila[Number(indice)] = valor as string;
+      filasNuevas.push(fila);
+    }
+  }
+
+  // Las actualizaciones celda a celda se agrupan en una sola petición (por
+  // tandas, para no superar el tamaño máximo admitido por la API).
+  for (let i = 0; i < dataUpdates.length; i += 400) {
+    const tanda = dataUpdates.slice(i, i + 400);
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: t.spreadsheetId,
+      requestBody: { valueInputOption: "RAW", data: tanda },
+    });
+  }
+
+  if (filasNuevas.length > 0) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: t.spreadsheetId,
+      range: `${t.tab}!A1:AN1`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: filasNuevas },
+    });
+  }
 }
 
 // Directorio maestro de estancos ("Universo Comerciales Agosto 2026" / hoja "BBDD ESTANCOS"),
