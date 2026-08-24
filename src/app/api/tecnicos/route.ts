@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { esProyectoValido } from "@/lib/proyectos";
+import { esProyectoValido, proyectoDesdeZonaTecnico } from "@/lib/proyectos";
 
 const SELECT_TECNICO = {
   id: true,
@@ -54,8 +54,23 @@ export async function GET(req: NextRequest) {
   if (filtrarPorProyecto) {
     // No hay un campo "proyecto" propio del técnico (puede atender varios) —
     // se considera "activo en el proyecto" si tiene alguna incidencia o
-    // material de ese proyecto encima ahora mismo.
-    where.OR = [{ materiales: { some: { proyecto } } }, { incidenciasAsig: { some: { proyecto } } }];
+    // material de ese proyecto encima ahora mismo. Para Andorra/Canarias/
+    // Portugal, que todavía no tienen ninguna incidencia/material real en la
+    // app, se añade también su propia zona/provincia como pista (Península
+    // y Blu no se pueden distinguir así, cualquier provincia española podría
+    // ser cualquiera de los dos, así que ahí no se aplica).
+    const porZona = ["ANDORRA", "CANARIAS", "PORTUGAL"].includes(proyecto!)
+      ? await prisma.user.findMany({
+          where: { role: "TECNICO", active: true },
+          select: { id: true, zona: true },
+        }).then((all) => all.filter((t) => proyectoDesdeZonaTecnico(t.zona) === proyecto).map((t) => t.id))
+      : [];
+
+    where.OR = [
+      { materiales: { some: { proyecto } } },
+      { incidenciasAsig: { some: { proyecto } } },
+      ...(porZona.length > 0 ? [{ id: { in: porZona } }] : []),
+    ];
   }
 
   let tecnicos = await prisma.user.findMany({ where, select: SELECT_TECNICO, orderBy: { name: "asc" } });
