@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseExcelAsignaciones } from "@/lib/excel-import";
+import { syncToSheets } from "@/lib/googleSheets";
 
 /**
  * POST /api/estancos/importar
@@ -118,7 +119,10 @@ export async function POST(req: NextRequest) {
       `[estancos/importar] Completado: ${estancosCreados} creados, ${estancosActualizados} actualizados, ${erroresImporte.length} errores`
     );
 
-    // TODO: Sincronizar con Google Sheets (syncToSheets)
+    // forceEstancos: true salta el throttle de 20 min — tras una importación
+    // manual deliberada tiene sentido reflejarlo ya, no esperar al próximo
+    // hueco del límite de frecuencia (pensado para el sync automático).
+    await syncToSheets("estancos", { forceEstancos: true });
 
     return NextResponse.json({
       ok: true,

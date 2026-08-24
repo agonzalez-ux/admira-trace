@@ -146,7 +146,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     include: { items: { include: { material: true } }, tecnico: true },
   });
 
-  await syncToSheets(["envios", "materiales"]);
+  await syncToSheets(["envios", "materiales", "tecnicos"]);
 
   return NextResponse.json({ envio: final, material });
 }

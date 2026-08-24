@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     },
   });
 
-  await syncToSheets(["incidencias", "materiales", "intervenciones", "censo"]);
+  await syncToSheets(["incidencias", "materiales", "intervenciones", "censo", "tecnicos"]);
 
   return NextResponse.json({ registro });
 }

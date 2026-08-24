@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseExcelInstalaciones, mapearStatusAIncidenciaEstado } from "@/lib/excel-import";
+import { syncToSheets } from "@/lib/googleSheets";
 
 /**
  * POST /api/incidencias/importar-instalaciones
@@ -144,7 +145,11 @@ export async function POST(req: NextRequest) {
       `[incidencias/importar-instalaciones] Completado: ${incidenciasCreadas} creadas, ${incidenciasActualizadas} actualizadas, ${erroresImporte.length} errores`
     );
 
-    // TODO: Sincronizar con Google Sheets (syncToSheets)
+    // Este Excel es la única fuente de datos nuevos de "Censo" (y también
+    // alimenta Informe/Intervenciones, que muestran las mismas incidencias)
+    // — sin esto, lo importado no aparecía en los documentos en vivo hasta
+    // que alguna acción no relacionada forzaba de rebote un resync completo.
+    await syncToSheets(["incidencias", "intervenciones", "censo"]);
 
     return NextResponse.json({
       ok: true,
