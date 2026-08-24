@@ -9,15 +9,22 @@ import ExcelJS from "exceljs";
 import { prisma } from "../src/lib/prisma";
 import { PROYECTO_LABELS } from "../src/lib/constants";
 
+// docker run --env-file (a diferencia del loader de Next.js) no quita las
+// comillas envolventes de KEY="valor", así que hay que quitarlas a mano
+// antes de deshacer los "\n" escapados.
+function limpiarEnv(v: string | undefined): string | undefined {
+  return v?.replace(/^"|"$/g, "");
+}
+
 async function main() {
-  const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\n/g, "\n");
+  const privateKey = limpiarEnv(process.env.GOOGLE_SHEETS_PRIVATE_KEY)?.replace(/\\n/g, "\n");
   const auth = new google.auth.JWT({
-    email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+    email: limpiarEnv(process.env.GOOGLE_SHEETS_CLIENT_EMAIL),
     key: privateKey,
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
   const drive = google.drive({ version: "v3", auth });
-  const fileId = process.env.GOOGLE_SHEETS_STOCK_ID!;
+  const fileId = limpiarEnv(process.env.GOOGLE_SHEETS_STOCK_ID)!;
   console.log("Usando GOOGLE_SHEETS_STOCK_ID:", fileId);
 
   const materiales = await prisma.material.findMany({ include: { tecnico: true, estancoInstalado: true } });
