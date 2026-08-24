@@ -31,7 +31,33 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json({ materiales });
+  // El material no guarda directamente dónde está instalado — se sabe a
+  // través de la incidencia en la que un técnico lo registró como instalado
+  // (ver POST /api/incidencias/[id]/material). Se busca aparte, y solo para
+  // el subconjunto ya instalado, para no cargar este join en cada material.
+  const idsInstalados = materiales.filter((m) => m.estado === "INSTALADO").map((m) => m.id);
+  const estancoPorMaterial = new Map<string, { id: string; nombre: string; municipio: string | null }>();
+  if (idsInstalados.length > 0) {
+    const usos = await prisma.incidenciaMaterial.findMany({
+      where: { materialId: { in: idsInstalados } },
+      orderBy: { fecha: "desc" },
+      include: { incidencia: { select: { estanco: { select: { id: true, nombre: true, municipio: true } } } } },
+    });
+    // Un material puede haberse instalado/desinstalado varias veces — con el
+    // orden descendente, la primera vez que se ve cada material ya es la más
+    // reciente, así que las siguientes se ignoran.
+    for (const uso of usos) {
+      if (estancoPorMaterial.has(uso.materialId) || !uso.incidencia.estanco) continue;
+      estancoPorMaterial.set(uso.materialId, uso.incidencia.estanco);
+    }
+  }
+
+  const resultado = materiales.map((m) => ({
+    ...m,
+    estancoInstalado: estancoPorMaterial.get(m.id) || null,
+  }));
+
+  return NextResponse.json({ materiales: resultado });
 }
 
 export async function POST(req: NextRequest) {

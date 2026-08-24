@@ -14,6 +14,7 @@ type Material = {
   imei: string | null;
   estado: string;
   tecnico: { id: string; name: string; zona: string | null } | null;
+  estancoInstalado: { id: string; nombre: string; municipio: string | null } | null;
 };
 
 const ESTADO_COLORS: Record<string, string> = {
@@ -116,6 +117,7 @@ export default function MaterialOverview() {
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
   const [tipoFiltro, setTipoFiltro] = useState<string | null>(null);
   const [tipoPorTecnico, setTipoPorTecnico] = useState<Record<string, string | null>>({});
+  const [tipoPorEstanco, setTipoPorEstanco] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     setLoading(true);
@@ -145,6 +147,7 @@ export default function MaterialOverview() {
   const flatFiltered = tipoFiltro ? baseFiltered.filter((m) => m.tipo === tipoFiltro) : baseFiltered;
 
   const porTecnico = useMemoGroupByTecnico(materiales);
+  const porEstanco = useMemoGroupByEstanco(materiales);
 
   if (loading) return <p className="text-sm text-slate-400 py-4">Cargando material…</p>;
 
@@ -167,7 +170,7 @@ export default function MaterialOverview() {
         ))}
       </div>
 
-      {filtro !== "TECNICO" && (
+      {filtro !== "TECNICO" && filtro !== "INSTALADO" && (
         <>
           <TotalesChips
             materiales={baseFiltered}
@@ -181,6 +184,36 @@ export default function MaterialOverview() {
             ))}
           </div>
         </>
+      )}
+
+      {filtro === "INSTALADO" && (
+        <div className="space-y-4">
+          {porEstanco.length === 0 && <p className="text-sm text-slate-400 py-6 text-center">No hay material instalado.</p>}
+          {porEstanco.map(({ estanco, items }) => {
+            const tipoActivo = tipoPorEstanco[estanco.id] || null;
+            const visibles = tipoActivo ? items.filter((m) => m.tipo === tipoActivo) : items;
+            return (
+              <div key={estanco.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3">
+                <div className="font-semibold text-slate-800 mb-2">
+                  {estanco.nombre}
+                  {estanco.municipio && <span className="text-xs font-normal text-slate-400"> · {estanco.municipio}</span>}
+                </div>
+                <TotalesChips
+                  materiales={items}
+                  tipoActivo={tipoActivo}
+                  onTipoClick={(tipo) =>
+                    setTipoPorEstanco((prev) => ({ ...prev, [estanco.id]: prev[estanco.id] === tipo ? null : tipo }))
+                  }
+                />
+                <div className="space-y-2">
+                  {visibles.map((m) => (
+                    <MaterialCard key={m.id} m={m} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {filtro === "TECNICO" && (
@@ -226,5 +259,27 @@ function useMemoGroupByTecnico(materiales: Material[]) {
       else groups.set(m.tecnico.id, { tecnico: m.tecnico, items: [m] });
     }
     return Array.from(groups.values()).sort((a, b) => a.tecnico.name.localeCompare(b.tecnico.name));
+  }, [materiales]);
+}
+
+const SIN_ESTANCO = { id: "__sin_estanco__", nombre: "Sin estanco vinculado", municipio: null as string | null };
+
+function useMemoGroupByEstanco(materiales: Material[]) {
+  return useMemo(() => {
+    const groups = new Map<string, { estanco: typeof SIN_ESTANCO; items: Material[] }>();
+    for (const m of materiales) {
+      if (m.estado !== "INSTALADO") continue;
+      const estanco = m.estancoInstalado || SIN_ESTANCO;
+      const g = groups.get(estanco.id);
+      if (g) g.items.push(m);
+      else groups.set(estanco.id, { estanco, items: [m] });
+    }
+    // "Sin estanco vinculado" al final — es el caso raro/a revisar, no debe
+    // tapar los estancos reales al principio de la lista.
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.estanco.id === SIN_ESTANCO.id) return 1;
+      if (b.estanco.id === SIN_ESTANCO.id) return -1;
+      return a.estanco.nombre.localeCompare(b.estanco.nombre);
+    });
   }, [materiales]);
 }
