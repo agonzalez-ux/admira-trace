@@ -45,8 +45,8 @@ export async function notificarComercial(incidenciaId: string, tipo: TipoAviso) 
 
   const texto =
     tipo === "PROGRAMADA"
-      ? `Hola,\n\nSe ha programado una visita técnica en el estanco ${incidencia.estanco.nombre} (${incidencia.estanco.direccion || ""}) para el ${fechaVisita}.\n\nIncidencia: ${incidencia.titulo}\nTécnico asignado: ${incidencia.tecnico?.name || ""}\n\nPor favor, avisad al estanquero de la fecha y hora previstas.\n\nAdmira Trace`
-      : `Hola,\n\nEl técnico ${incidencia.tecnico?.name || ""} está de camino ahora mismo al estanco ${incidencia.estanco.nombre} (${incidencia.estanco.direccion || ""}) para la visita programada${fechaVisita ? ` el ${fechaVisita}` : ""}.\n\nIncidencia: ${incidencia.titulo}\n\nPor favor, avisad al estanquero.\n\nAdmira Trace`;
+      ? `Hola,\n\nSe ha programado una visita técnica en el estanco ${incidencia.estanco.nombre} (${incidencia.estanco.direccion || ""}) para el ${fechaVisita}.\n\nIncidencia: ${incidencia.titulo}\nTécnico asignado: ${incidencia.tecnico?.name || ""}\n\nPor favor, avisad al estanquero de la fecha y hora previstas.\n\nAltadis Soporte`
+      : `Hola,\n\nEl técnico ${incidencia.tecnico?.name || ""} está de camino ahora mismo al estanco ${incidencia.estanco.nombre} (${incidencia.estanco.direccion || ""}) para la visita programada${fechaVisita ? ` el ${fechaVisita}` : ""}.\n\nIncidencia: ${incidencia.titulo}\n\nPor favor, avisad al estanquero.\n\nAltadis Soporte`;
 
   const resultado = await sendEmail({ to: destinatario, subject: asunto, text: texto });
 

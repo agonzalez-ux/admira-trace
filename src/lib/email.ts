@@ -17,7 +17,7 @@ const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASSWORD = process.env.SMTP_PASSWORD;
-const SMTP_FROM = process.env.SMTP_FROM || (SMTP_USER ? `Admira Trace <${SMTP_USER}>` : "");
+const SMTP_FROM = process.env.SMTP_FROM || (SMTP_USER ? `Altadis Soporte <${SMTP_USER}>` : "");
 const SMTP_REPLY_TO = process.env.SMTP_REPLY_TO || "";
 // Se pone en copia en TODOS los correos que manda la app, sin excepción —
 // para que ese buzón siga viendo todo lo que se envía aunque cambie la

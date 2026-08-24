@@ -123,10 +123,10 @@ export function construirCorreoTransportista({ envio, pedido }: DatosCorreoTrans
     envio.notas ? `Notas: ${envio.notas}` : null,
     envio.notas ? `` : null,
     `Un saludo,`,
-    `Admira`,
+    `Altadis Soporte`,
     ``,
     `---`,
-    `Enviado automáticamente por Admira Trace · Movimiento #${envio.id}`,
+    `Enviado automáticamente por Altadis Soporte · Movimiento #${envio.id}`,
   ]
     .filter((l) => l !== null)
     .join("\n");
