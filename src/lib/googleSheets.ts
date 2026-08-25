@@ -69,34 +69,44 @@ function getDriveClient() {
 
 // --- Utilidades genéricas, parametrizadas por spreadsheetId ---------------
 
-const ensuredTabsCache = new Set<string>(); // spreadsheetId ya comprobado
+// Clave `${spreadsheetId}:${tab}` — OJO: antes se guardaba solo el
+// spreadsheetId, así que en cuanto se comprobaba UNA pestaña de un documento,
+// cualquier OTRA pestaña nueva de ese mismo documento dejaba de comprobarse
+// (nunca llegaba a crearse) durante el resto de vida del proceso. Con los
+// documentos reales, que no tienen pre-creadas todas las pestañas que el
+// código espera, eso hacía fallar la escritura con "Unable to parse range".
+const ensuredTabsCache = new Set<string>();
+// Serializa las comprobaciones por documento para no crear la misma pestaña
+// dos veces si llegan varias llamadas en paralelo.
 const ensureTabsPromises = new Map<string, Promise<void>>();
 
 async function ensureTabsExist(spreadsheetId: string, tabNames: string[]) {
   const sheets = getClient();
-  if (!sheets || ensuredTabsCache.has(spreadsheetId)) return;
+  if (!sheets) return;
 
-  if (!ensureTabsPromises.has(spreadsheetId)) {
-    const promise = (async () => {
-      const meta = await sheets.spreadsheets.get({ spreadsheetId });
-      const existing = new Set((meta.data.sheets || []).map((s) => s.properties?.title));
+  const pendientes = tabNames.filter((t) => !ensuredTabsCache.has(`${spreadsheetId}:${t}`));
+  if (pendientes.length === 0) return;
 
-      const missing = tabNames.filter((name) => !existing.has(name));
-      if (missing.length > 0) {
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId,
-          requestBody: { requests: missing.map((title) => ({ addSheet: { properties: { title } } })) },
-        });
-      }
-      ensuredTabsCache.add(spreadsheetId);
-    })().catch((err) => {
-      ensureTabsPromises.delete(spreadsheetId);
-      throw err;
-    });
-    ensureTabsPromises.set(spreadsheetId, promise);
-  }
+  const anterior = ensureTabsPromises.get(spreadsheetId) || Promise.resolve();
+  const promise = anterior.catch(() => {}).then(async () => {
+    const aunPendientes = pendientes.filter((t) => !ensuredTabsCache.has(`${spreadsheetId}:${t}`));
+    if (aunPendientes.length === 0) return;
 
-  await ensureTabsPromises.get(spreadsheetId);
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const existentes = new Set((meta.data.sheets || []).map((s) => s.properties?.title));
+
+    const faltan = aunPendientes.filter((t) => !existentes.has(t));
+    if (faltan.length > 0) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: { requests: faltan.map((title) => ({ addSheet: { properties: { title } } })) },
+      });
+    }
+    for (const t of aunPendientes) ensuredTabsCache.add(`${spreadsheetId}:${t}`);
+  });
+  ensureTabsPromises.set(spreadsheetId, promise);
+
+  await promise;
 }
 
 const CHUNK_SIZE = 2000; // filas por petición, para no exceder el tamaño máximo de la API
@@ -365,7 +375,15 @@ async function syncIncidencias() {
   });
   const t = target("incidencias");
   await writeSheet(t.spreadsheetId, t.tab, HEADER_INCIDENCIAS, incidencias.map(filaIncidencia));
-  await syncVistasFiltradasIncidencias(incidencias, t.spreadsheetId);
+  // DESACTIVADO: "Plantilla Informe Incidencias Automatizado" es el documento
+  // REAL del equipo, y sus pestañas "No contestan", "Pendiente acción
+  // estanquero", "TFTs", "TFTs OK", "SVM"* ya tienen contenido real propio
+  // (listas de estancos con seguimiento manual, o resúmenes con fórmulas) que
+  // NO tiene nada que ver con esta vista filtrada de incidencias — escribir
+  // ahí sobrescribía y destruía ese contenido real. Esta función solo debe
+  // volver a activarse si se rediseña para escribir en pestañas propias de la
+  // app, no en las que ya usa el equipo con otro propósito.
+  // await syncVistasFiltradasIncidencias(incidencias, t.spreadsheetId);
 }
 
 // Réplica de las 9 pestañas de filtro de "Plantilla Informe Incidencias Automatizado"
