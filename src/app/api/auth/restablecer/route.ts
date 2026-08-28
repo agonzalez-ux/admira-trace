@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { registrarCredencial } from "@/lib/credencialesVault";
 
 const MIN_LONGITUD = 8;
 
@@ -44,7 +45,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const registro = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(token) } });
+  const registro = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash: hashToken(token) },
+    include: { user: true },
+  });
   if (!registro || registro.usadoAt || registro.expiraAt < new Date()) {
     return NextResponse.json({ error: "El enlace no es válido o ha caducado." }, { status: 400 });
   }
@@ -56,6 +60,14 @@ export async function POST(req: NextRequest) {
       debeCambiarPassword: false,
       passwordCambiadaAt: new Date(),
     },
+  });
+
+  await registrarCredencial({
+    usuario: registro.user.username,
+    nombre: registro.user.name,
+    rol: registro.user.role,
+    email: registro.user.email,
+    password: passwordNueva,
   });
 
   // El token es de un solo uso.

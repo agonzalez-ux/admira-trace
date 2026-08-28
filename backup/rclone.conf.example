@@ -1,0 +1,18 @@
+# Plantilla de referencia — NO contiene credenciales reales.
+#
+# El fichero real vive en ~/.config/rclone/rclone.conf en el VPS. Como el VPS
+# no tiene entorno gráfico, NO se puede correr `rclone config` interactivo
+# con navegador ahí. En su lugar:
+#
+#   1. En tu PC (con navegador): `rclone authorize "drive"`
+#      Se abre el navegador, inicias sesión con agonzalez@admira.com,
+#      autorizas, y la terminal imprime un bloque JSON (el "token").
+#   2. En el VPS: `rclone config create gdrive drive scope=drive token='<pega el JSON aquí>'`
+#      (o edita ~/.config/rclone/rclone.conf a mano con el bloque de abajo).
+#
+# Ver backup/README.md para el paso a paso completo.
+
+[gdrive]
+type = drive
+scope = drive
+token = {"access_token":"...","token_type":"Bearer","refresh_token":"...","expiry":"..."}

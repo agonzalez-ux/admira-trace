@@ -18,3 +18,6 @@ tsconfig.tsbuildinfo
 Tecnico-Cerca-main.zip
 scripts/tecnico_cerca.sqlite
 backups-sheets-reales/
+backup-staging/
+backup/rclone.conf
+data/secreto/

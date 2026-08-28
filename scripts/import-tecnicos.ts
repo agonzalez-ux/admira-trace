@@ -19,6 +19,7 @@ import { randomBytes } from "crypto";
 // Cliente compartido: si están las variables TURSO_DATABASE_URL/TURSO_AUTH_TOKEN
 // en el entorno, escribe directamente en Turso; si no, en el fichero local.
 import { prisma } from "../src/lib/prisma";
+import { registrarCredencial } from "../src/lib/credencialesVault";
 
 const CLIENT_EMAIL = process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
 const PRIVATE_KEY = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, "\n");
@@ -207,6 +208,7 @@ async function main() {
       },
     });
     credenciales.push({ nombre: f.empresa, username, password: passwordPlano, email });
+    await registrarCredencial({ usuario: username, nombre: f.empresa, rol: "TECNICO", email, password: passwordPlano });
     creados += 1;
   }
 

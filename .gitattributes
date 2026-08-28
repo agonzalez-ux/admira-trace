@@ -1,0 +1,4 @@
+# Los scripts de shell deben conservar siempre saltos de línea LF (Unix) —
+# si Git los convirtiera a CRLF en un checkout Windows y luego se subieran
+# así al VPS, fallarían con errores crípticos tipo "bad interpreter".
+*.sh text eol=lf

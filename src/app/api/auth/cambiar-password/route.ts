@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { registrarCredencial } from "@/lib/credencialesVault";
 
 const MIN_LONGITUD = 8;
 
@@ -45,6 +46,14 @@ export async function POST(req: NextRequest) {
       debeCambiarPassword: false,
       passwordCambiadaAt: new Date(),
     },
+  });
+
+  await registrarCredencial({
+    usuario: user.username,
+    nombre: user.name,
+    rol: user.role,
+    email: user.email,
+    password: passwordNueva,
   });
 
   return NextResponse.json({ ok: true });
