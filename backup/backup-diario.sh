@@ -84,10 +84,11 @@ if [ -d "$STAGING_DIR/fotos" ]; then
 fi
 
 # --- 3. Secreto: vault cifrado con GPG (se sobrescribe; Drive guarda versiones previas) ---
-if [ -f "$HOST_SECRETO_DIR/credenciales-vault.tsv" ]; then
-  gpg --yes --trust-model always --encrypt --recipient "$GPG_RECIPIENT" \
-    --output "$STAGING_DIR/credenciales-vault.tsv.gpg" \
-    "$HOST_SECRETO_DIR/credenciales-vault.tsv"
+# El fichero lo escribe el proceso DENTRO del contenedor (usuario "node"), así
+# que el usuario del host que corre este script necesita sudo para leerlo.
+if sudo test -f "$HOST_SECRETO_DIR/credenciales-vault.tsv"; then
+  sudo cat "$HOST_SECRETO_DIR/credenciales-vault.tsv" | gpg --yes --trust-model always --encrypt --recipient "$GPG_RECIPIENT" \
+    --output "$STAGING_DIR/credenciales-vault.tsv.gpg"
   rclone copyto "$STAGING_DIR/credenciales-vault.tsv.gpg" "$REMOTE/Secreto/credenciales-vault.tsv.gpg"
   echo "[backup] Vault de credenciales cifrado y subido."
 else
