@@ -299,13 +299,75 @@ model Incidencia {
   comercialAvisadoProgramada Boolean @default(false)
   comercialAvisadoEnCamino   Boolean @default(false)
 
-  fotos            FotoEvidencia[]
-  materialesUsados IncidenciaMaterial[]
-  notificaciones   NotificacionComercial[]
+  // --- Viabilidad de instalación (solo aplica a tipo INSTALACION_NUEVA) ---
+  // PENDIENTE_RESPUESTA | RESPONDIDO | VIABLE | NO_VIABLE. Por defecto
+  // "VIABLE" para no afectar a nada ya existente (reparaciones, mantenimientos
+  // e instalaciones importadas antes de que existiera este flujo) — solo las
+  // instalaciones creadas a partir de ahora arrancan en PENDIENTE_RESPUESTA.
+  // Mientras no sea VIABLE, la instalación no aparece en la bandeja de
+  // asignación a técnico (ver IncidenciasBoard.tsx).
+  viabilidadEstado       String    @default("VIABLE")
+  // Excel semanal (guardado en Drive) y fila donde vive esta instalación, para
+  // poder volver a abrir exactamente ese fichero cuando llegue la respuesta
+  // del comercial — ver src/lib/viabilidadExcel.ts.
+  viabilidadExcelFileId  String?
+  viabilidadExcelFila    Int?
+
+  fotos              FotoEvidencia[]
+  materialesUsados   IncidenciaMaterial[]
+  notificaciones     NotificacionComercial[]
+  viabilidadRespuesta ViabilidadRespuesta?
+  viabilidadFotos     ViabilidadFoto[]
+  viabilidadTokens    ViabilidadToken[]
+}
+
+// Respuesta del comercial al formulario de viabilidad de una instalación
+// (enviado por email tras importar el Excel semanal, sin necesidad de cuenta
+// — ver src/app/formulario-viabilidad y src/lib/viabilidad.ts).
+model ViabilidadRespuesta {
+  id                          String     @id @default(cuid())
+  incidenciaId                String     @unique
+  incidencia                  Incidencia @relation(fields: [incidenciaId], references: [id])
+  materialConfirmado          Boolean
+  materialCorreccion          String?
+  // HUECO | PARED
+  tipoUbicacion               String
+  medidasAncho                Float?
+  medidasAlto                 Float?
+  medidasFondo                Float?
+  puntosElectricosCercanos    Boolean
+  puntosElectricosComentario  String?
+  sePuedeTaladrar             Boolean
+  comentarios                 String?
+  respondidoPorNombre         String?
+  respondidoEn                DateTime   @default(now())
+}
+
+// Fotos del sitio de instalación adjuntadas en el formulario de viabilidad
+// (paralelo a FotoEvidencia, que es para evidencia de trabajo ya realizado).
+model ViabilidadFoto {
+  id           String     @id @default(cuid())
+  incidenciaId String
+  incidencia   Incidencia @relation(fields: [incidenciaId], references: [id])
+  url          String
+  fecha        DateTime   @default(now())
+}
+
+// Token de un solo uso para el formulario de viabilidad, enviado por email al
+// comercial del estanco — mismo patrón que PasswordResetToken (hasheado,
+// caduca, un solo uso), pero sin cuenta de usuario: apunta a la incidencia.
+model ViabilidadToken {
+  id           String     @id @default(cuid())
+  tokenHash    String     @unique
+  incidenciaId String
+  incidencia   Incidencia @relation(fields: [incidenciaId], references: [id])
+  expiraAt     DateTime
+  usadoAt      DateTime?
+  createdAt    DateTime   @default(now())
 }
 
 // Log de los avisos automáticos enviados al comercial de un estanco.
-// tipo: PROGRAMADA | EN_CAMINO
+// tipo: PROGRAMADA | EN_CAMINO | SOLICITUD_VIABILIDAD
 model NotificacionComercial {
   id           String     @id @default(cuid())
   incidenciaId String

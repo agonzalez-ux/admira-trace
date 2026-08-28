@@ -55,6 +55,10 @@ export interface FilaInstalacion {
   provincia: string | null;
   asignacionActual: string | null;
   comentarios: string | null;
+  // Fila real del Excel (1-based) de la que se leyó — se guarda en la
+  // instalación para poder reabrir el mismo Excel y escribir en la misma
+  // fila cuando llegue la respuesta de viabilidad del comercial.
+  filaExcel: number;
 }
 
 /**
@@ -227,6 +231,7 @@ export async function parseExcelInstalaciones(archivo: File): Promise<{
           provincia: celdaTexto(row, headers, "PROVINCIA"),
           asignacionActual: celdaTexto(row, headers, "ASIGNACION ACTUAL"),
           comentarios: celdaTexto(row, headers, "COMENTARIOS"),
+          filaExcel: i,
         };
 
         filas.push(fila);

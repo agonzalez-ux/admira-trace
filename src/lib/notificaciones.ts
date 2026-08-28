@@ -17,7 +17,8 @@ export type TipoNotificacion =
   | "INCIDENCIA_EN_CAMINO"
   | "INCIDENCIA_RESUELTA"
   | "INCIDENCIAS_DESK_NUEVAS"
-  | "LIMPIEZA_COMPLETADA";
+  | "LIMPIEZA_COMPLETADA"
+  | "VIABILIDAD_RESPONDIDA";
 
 type EntidadTipo = "envio" | "incidencia";
 

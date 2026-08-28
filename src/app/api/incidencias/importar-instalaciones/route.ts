@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseExcelInstalaciones, mapearStatusAIncidenciaEstado } from "@/lib/excel-import";
 import { syncToSheets } from "@/lib/googleSheets";
+import { guardarExcelSemanalEnDrive } from "@/lib/viabilidadExcel";
+import { solicitarViabilidadComercial } from "@/lib/viabilidad";
 
 /**
  * POST /api/incidencias/importar-instalaciones
@@ -45,9 +47,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Se guarda el propio Excel en Drive (es el documento real que el equipo
+    // ya revisa) con las columnas de viabilidad añadidas — así, conforme
+    // vayan respondiendo los comerciales, se puede volver a abrir y rellenar
+    // fila a fila. Si no hay carpeta de Drive configurada, sigue funcionando
+    // igual, solo sin esta parte (queda registrado en consola).
+    const excelBuffer = Buffer.from(await archivo.arrayBuffer());
+    const excelFileId = await guardarExcelSemanalEnDrive(excelBuffer, archivo.name).catch((err) => {
+      console.error("[importar-instalaciones] Error guardando el Excel en Drive:", err);
+      return null;
+    });
+
     let incidenciasCreadas = 0;
     let incidenciasActualizadas = 0;
     const erroresImporte: string[] = [];
+    const instalacionesNuevasIds: string[] = [];
 
     for (const fila of filas) {
       try {
@@ -93,7 +107,7 @@ export async function POST(req: NextRequest) {
           incidenciasActualizadas++;
         } else {
           // Crear nueva incidencia
-          await prisma.incidencia.create({
+          const nueva = await prisma.incidencia.create({
             data: {
               ticketExternoId: fila.sr,
               origen: "MANUAL",
@@ -116,9 +130,15 @@ export async function POST(req: NextRequest) {
               ...(nuevoEstado === "RESUELTA" && !fila.fechaFinalizacion
                 ? { fechaResuelta: new Date() }
                 : {}),
+              // Pendiente de confirmar viabilidad con el comercial antes de
+              // poder asignarla a un técnico (ver src/lib/viabilidad.ts).
+              viabilidadEstado: "PENDIENTE_RESPUESTA",
+              viabilidadExcelFileId: excelFileId,
+              viabilidadExcelFila: fila.filaExcel,
             },
           });
           incidenciasCreadas++;
+          instalacionesNuevasIds.push(nueva.id);
         }
       } catch (err) {
         erroresImporte.push(
@@ -150,6 +170,16 @@ export async function POST(req: NextRequest) {
     // — sin esto, lo importado no aparecía en los documentos en vivo hasta
     // que alguna acción no relacionada forzaba de rebote un resync completo.
     await syncToSheets(["incidencias", "intervenciones", "censo"]);
+
+    // Se envía el formulario de viabilidad solo para las instalaciones
+    // NUEVAS (no en cada reimportación semanal de una ya existente). En
+    // segundo plano: un fallo de email de una fila no debe bloquear la
+    // respuesta de la importación, que ya ha guardado todo en BD.
+    for (const id of instalacionesNuevasIds) {
+      solicitarViabilidadComercial(id).catch((err) =>
+        console.error(`[importar-instalaciones] Error solicitando viabilidad para ${id}:`, err)
+      );
+    }
 
     return NextResponse.json({
       ok: true,

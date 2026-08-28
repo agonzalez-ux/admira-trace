@@ -57,6 +57,8 @@ export async function GET(req: NextRequest) {
       estanco: { select: { nombre: true, comercial: true, telefonoComercial: true, correoComercial: true } },
       fotos: true,
       materialesUsados: { include: { material: true } },
+      viabilidadRespuesta: true,
+      viabilidadFotos: true,
     },
     orderBy: { fechaImportada: "desc" },
   });

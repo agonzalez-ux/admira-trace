@@ -370,7 +370,7 @@ export default function IncidenciasBoard({
   const [scanTarget, setScanTarget] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [sincronizando, setSincronizando] = useState(false);
-  const [vista, setVista] = useState<"SIN_ASIGNAR" | "ASIGNADAS">("SIN_ASIGNAR");
+  const [vista, setVista] = useState<"SIN_ASIGNAR" | "ASIGNADAS" | "PENDIENTE_VIABILIDAD">("SIN_ASIGNAR");
   const [detalle, setDetalle] = useState<Incidencia | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [ultimaSync, setUltimaSync] = useState<UltimaSincronizacion>(null);
@@ -476,11 +476,29 @@ export default function IncidenciasBoard({
   const incidenciasDelModo = incidencias.filter((i) =>
     modo === "INSTALACIONES" ? i.tipo === "INSTALACION_NUEVA" : i.tipo !== "INSTALACION_NUEVA"
   );
-  const sinAsignar = incidenciasDelModo.filter((i) => i.estado === "SIN_ASIGNAR");
-  const asignadas = incidenciasDelModo.filter((i) => i.estado !== "SIN_ASIGNAR");
+  // Una instalación con el comercial sin confirmar viabilidad todavía no
+  // puede asignarse a ningún técnico — se queda en su propia bandeja hasta
+  // que alguien del equipo la marque VIABLE (ver PanelViabilidad).
+  const pendienteViabilidad =
+    modo === "INSTALACIONES"
+      ? incidenciasDelModo.filter((i) => i.viabilidadEstado === "PENDIENTE_RESPUESTA" || i.viabilidadEstado === "RESPONDIDO")
+      : [];
+  const sinAsignar = incidenciasDelModo.filter(
+    (i) => i.estado === "SIN_ASIGNAR" && (modo !== "INSTALACIONES" || i.viabilidadEstado === "VIABLE")
+  );
+  const asignadas = incidenciasDelModo.filter(
+    (i) => i.estado !== "SIN_ASIGNAR" && !pendienteViabilidad.includes(i)
+  );
 
   // Para el técnico no hay bandeja "sin asignar": solo ve las suyas ya asignadas.
-  const listaBase = role === "ADMIRA" ? (vista === "SIN_ASIGNAR" ? sinAsignar : asignadas) : asignadas;
+  const listaBase =
+    role === "ADMIRA"
+      ? vista === "SIN_ASIGNAR"
+        ? sinAsignar
+        : vista === "PENDIENTE_VIABILIDAD"
+          ? pendienteViabilidad
+          : asignadas
+      : asignadas;
 
   const q = busqueda.trim().toLowerCase();
   const visibles = q
@@ -522,6 +540,16 @@ export default function IncidenciasBoard({
               >
                 Asignadas ({asignadas.length})
               </button>
+              {modo === "INSTALACIONES" && (
+                <button
+                  onClick={() => setVista("PENDIENTE_VIABILIDAD")}
+                  className={`text-xs font-medium rounded-lg px-3 py-2 transition-colors ${
+                    vista === "PENDIENTE_VIABILIDAD" ? "bg-admira-600 text-white" : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                  }`}
+                >
+                  ⏳ Pendientes de viabilidad ({pendienteViabilidad.length})
+                </button>
+              )}
             </div>
             {/* La sincronización con el desk es una sola acción global — con
                 dos pestañas (Incidencias/Instalaciones) mostrando el mismo
@@ -695,7 +723,11 @@ export default function IncidenciasBoard({
           role={role}
           onClose={() => setDetalle(null)}
           onActualizada={(actualizada) => {
-            setDetalle((prev) => (prev ? { ...prev, estanco: actualizada.estanco ?? null } : prev));
+            setDetalle((prev) =>
+              prev
+                ? { ...prev, estanco: actualizada.estanco ?? prev.estanco, viabilidadEstado: actualizada.viabilidadEstado ?? prev.viabilidadEstado }
+                : prev
+            );
             load();
           }}
         />

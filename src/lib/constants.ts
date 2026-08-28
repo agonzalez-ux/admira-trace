@@ -152,3 +152,16 @@ export const ESTADO_INCIDENCIA_LABELS: Record<EstadoIncidencia, string> = {
   EN_CAMINO: "En camino",
   RESUELTA: "Resuelta",
 };
+
+// Estado del formulario de viabilidad de una instalación nueva (ver
+// src/lib/viabilidad.ts). Mientras no esté en VIABLE, la instalación no
+// aparece en la bandeja de asignación a técnico.
+export const ESTADOS_VIABILIDAD = ["PENDIENTE_RESPUESTA", "RESPONDIDO", "VIABLE", "NO_VIABLE"] as const;
+export type EstadoViabilidad = (typeof ESTADOS_VIABILIDAD)[number];
+
+export const ESTADO_VIABILIDAD_LABELS: Record<EstadoViabilidad, string> = {
+  PENDIENTE_RESPUESTA: "Esperando respuesta del comercial",
+  RESPONDIDO: "Respondido — pendiente de revisión",
+  VIABLE: "Viable",
+  NO_VIABLE: "No viable",
+};

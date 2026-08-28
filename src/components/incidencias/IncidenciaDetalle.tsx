@@ -5,6 +5,7 @@ import {
   ESTADO_INCIDENCIA_LABELS,
   TIPO_INCIDENCIA_LABELS,
   TIPO_MATERIAL_LABELS,
+  ESTADO_VIABILIDAD_LABELS,
 } from "@/lib/constants";
 import WhatsAppButton from "./WhatsAppButton";
 import { obtenerNumeroWhatsAppRotativo, generarMensajeInstalacion } from "@/lib/whatsapp";
@@ -36,6 +37,22 @@ export type IncidenciaDetalleData = {
   } | null;
   fotos: { id: string; url: string }[];
   materialesUsados: { id: string; material: { numeroSerie: string; nombre: string; tipo: string } }[];
+  viabilidadEstado?: string;
+  viabilidadRespuesta?: {
+    materialConfirmado: boolean;
+    materialCorreccion: string | null;
+    tipoUbicacion: string;
+    medidasAncho: number | null;
+    medidasAlto: number | null;
+    medidasFondo: number | null;
+    puntosElectricosCercanos: boolean;
+    puntosElectricosComentario: string | null;
+    sePuedeTaladrar: boolean;
+    comentarios: string | null;
+    respondidoPorNombre: string | null;
+    respondidoEn: string;
+  } | null;
+  viabilidadFotos?: { id: string; url: string }[];
 };
 
 type EstancoResultado = { id: string; idEstanco: string; nombre: string; municipio: string | null; provincia: string | null };
@@ -117,6 +134,159 @@ function VincularEstanco({
               </span>
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Panel de viabilidad de instalación: muestra la respuesta del comercial (si
+ * ya la hay) y deja a Admira marcar viable/no viable, o reenviar el
+ * formulario si sigue sin respuesta.
+ */
+function PanelViabilidad({
+  inc,
+  role,
+  onActualizada,
+}: {
+  inc: IncidenciaDetalleData;
+  role: "TECNICO" | "ADMIRA";
+  onActualizada?: (incidencia: IncidenciaDetalleData) => void;
+}) {
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reenviado, setReenviado] = useState(false);
+
+  if (role !== "ADMIRA" || !onActualizada) {
+    return (
+      <span className="text-[11px] rounded-full px-2 py-0.5 bg-amber-100 text-amber-800">
+        Viabilidad: {ESTADO_VIABILIDAD_LABELS[inc.viabilidadEstado as keyof typeof ESTADO_VIABILIDAD_LABELS] || inc.viabilidadEstado}
+      </span>
+    );
+  }
+
+  async function decidir(decision: "VIABLE" | "NO_VIABLE") {
+    setCargando(true);
+    setError(null);
+    const res = await fetch(`/api/incidencias/${inc.id}/viabilidad`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accion: "decidir", decision }),
+    });
+    setCargando(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "No se ha podido guardar la decisión.");
+      return;
+    }
+    onActualizada!({ ...inc, viabilidadEstado: decision });
+  }
+
+  async function reenviar() {
+    setCargando(true);
+    setError(null);
+    const res = await fetch(`/api/incidencias/${inc.id}/viabilidad`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accion: "reenviar" }),
+    });
+    setCargando(false);
+    if (!res.ok) {
+      setError("No se ha podido reenviar el formulario.");
+      return;
+    }
+    setReenviado(true);
+  }
+
+  const r = inc.viabilidadRespuesta;
+
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Viabilidad de instalación</h3>
+        <span className="text-[11px] rounded-full px-2 py-0.5 bg-amber-100 text-amber-800">
+          {ESTADO_VIABILIDAD_LABELS[inc.viabilidadEstado as keyof typeof ESTADO_VIABILIDAD_LABELS] || inc.viabilidadEstado}
+        </span>
+      </div>
+
+      {inc.viabilidadEstado === "PENDIENTE_RESPUESTA" && (
+        <div className="text-xs text-slate-600 space-y-1.5">
+          <p>Todavía no ha respondido el comercial.</p>
+          <button
+            onClick={reenviar}
+            disabled={cargando || reenviado}
+            className="text-xs font-medium bg-slate-700 hover:bg-slate-800 text-white rounded-lg px-3 py-1.5 disabled:opacity-60"
+          >
+            {reenviado ? "Formulario reenviado" : "Reenviar formulario"}
+          </button>
+        </div>
+      )}
+
+      {r && (
+        <dl className="text-xs space-y-1">
+          <div className="flex gap-1">
+            <dt className="text-slate-400">Material confirmado:</dt>
+            <dd className="text-slate-700">{r.materialConfirmado ? "Sí" : `No — ${r.materialCorreccion || "sin detalle"}`}</dd>
+          </div>
+          <div className="flex gap-1">
+            <dt className="text-slate-400">Ubicación:</dt>
+            <dd className="text-slate-700">
+              {r.tipoUbicacion === "HUECO" ? "Hueco" : "Pared"}
+              {r.tipoUbicacion === "HUECO" && r.medidasAncho ? ` — ${r.medidasAncho} x ${r.medidasAlto} x ${r.medidasFondo} cm` : ""}
+            </dd>
+          </div>
+          <div className="flex gap-1">
+            <dt className="text-slate-400">Puntos eléctricos cerca:</dt>
+            <dd className="text-slate-700">
+              {r.puntosElectricosCercanos ? `Sí${r.puntosElectricosComentario ? ` — ${r.puntosElectricosComentario}` : ""}` : "No"}
+            </dd>
+          </div>
+          <div className="flex gap-1">
+            <dt className="text-slate-400">Se puede taladrar:</dt>
+            <dd className="text-slate-700">{r.sePuedeTaladrar ? "Sí" : "No"}</dd>
+          </div>
+          {r.comentarios && (
+            <div>
+              <dt className="text-slate-400">Comentarios:</dt>
+              <dd className="text-slate-700">{r.comentarios}</dd>
+            </div>
+          )}
+          <div className="flex gap-1">
+            <dt className="text-slate-400">Respondido por:</dt>
+            <dd className="text-slate-700">{r.respondidoPorNombre || "—"} · {fmt(r.respondidoEn)}</dd>
+          </div>
+        </dl>
+      )}
+
+      {inc.viabilidadFotos && inc.viabilidadFotos.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {inc.viabilidadFotos.map((f) => (
+            <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer">
+              <img src={f.url} alt="Sitio de instalación" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+            </a>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      {inc.viabilidadEstado === "RESPONDIDO" && (
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => decidir("VIABLE")}
+            disabled={cargando}
+            className="flex-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1.5 disabled:opacity-60"
+          >
+            ✓ Marcar viable
+          </button>
+          <button
+            onClick={() => decidir("NO_VIABLE")}
+            disabled={cargando}
+            className="flex-1 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg py-1.5 disabled:opacity-60"
+          >
+            ✗ No viable
+          </button>
         </div>
       )}
     </div>
@@ -371,6 +541,12 @@ export default function IncidenciaDetalle({
             </div>
           </div>
         </div>
+
+        {inc.tipo === "INSTALACION_NUEVA" && (inc.viabilidadEstado !== "VIABLE" || inc.viabilidadRespuesta) && (
+          <div className="mt-4">
+            <PanelViabilidad inc={inc} role={role} onActualizada={onActualizada} />
+          </div>
+        )}
       </div>
     </div>
   );

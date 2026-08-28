@@ -7,6 +7,7 @@ import {
   ESTADO_INCIDENCIA_LABELS,
   TIPO_INCIDENCIA_LABELS,
   PROYECTO_LABELS,
+  ESTADO_VIABILIDAD_LABELS,
 } from "./constants";
 import { DOCUMENTOS, DocumentKey, getDocumentSpreadsheetId, getDocumentUrl } from "./documentSheets";
 import { etiquetaOrigenIncidencia } from "./materialLabel";
@@ -53,7 +54,7 @@ function getClient() {
 // descargar/subir el archivo entero con la API de Drive.
 let driveClient: ReturnType<typeof google.drive> | null = null;
 
-function getDriveClient() {
+export function getDriveClient() {
   if (!CLIENT_EMAIL || !PRIVATE_KEY) return null;
   if (driveClient) return driveClient;
 
@@ -567,7 +568,12 @@ function columnaALetra(indice0: number): string {
 // celda a celda, las columnas que la app conoce con certeza; el resto de la
 // fila queda intacto. Las instalaciones que aún no estén en la hoja se
 // añaden al final, con solo esas columnas rellenas y el resto en blanco.
-const CENSO_TOTAL_COLUMNAS = 40; // A..AN, según la hoja real
+// A..AN (0-39) es la hoja real del cliente, completa, sin ningún hueco libre
+// (AE-AN las usa el propio equipo: pantalla/soporte/router/Motivo Pospuesto/
+// datos del comercial/DRIVE). Las columnas de viabilidad son una ampliación
+// nueva de la hoja, a partir de AO (40) — confirmado con el usuario que sí
+// se puede ampliar el ancho del documento para esto.
+const CENSO_TOTAL_COLUMNAS = 50; // A..AX
 const CENSO_COLUMNAS_APP = {
   sr: 1, // B
   fechaAsignacion: 2, // C
@@ -584,7 +590,75 @@ const CENSO_COLUMNAS_APP = {
   seriePantalla: 22, // W
   informacionSolicitud: 27, // AB
   ultimaActualizacion: 29, // AD
+  // --- Viabilidad de instalación (ver src/lib/viabilidad.ts) ---
+  viabilidadEstado: 40, // AO
+  viabilidadMaterialConfirmado: 41, // AP
+  viabilidadUbicacion: 42, // AQ
+  viabilidadMedidas: 43, // AR
+  viabilidadPuntosElectricos: 44, // AS
+  viabilidadTaladrar: 45, // AT
+  viabilidadComentarios: 46, // AU
+  viabilidadRespondidoPor: 47, // AV
+  viabilidadFechaRespuesta: 48, // AW
 } as const;
+
+const CENSO_CABECERA_VIABILIDAD: Partial<Record<keyof typeof CENSO_COLUMNAS_APP, string>> = {
+  viabilidadEstado: "Viabilidad — Estado",
+  viabilidadMaterialConfirmado: "Viabilidad — Material confirmado",
+  viabilidadUbicacion: "Viabilidad — Hueco/Pared",
+  viabilidadMedidas: "Viabilidad — Medidas",
+  viabilidadPuntosElectricos: "Viabilidad — Puntos eléctricos cerca",
+  viabilidadTaladrar: "Viabilidad — Se puede taladrar",
+  viabilidadComentarios: "Viabilidad — Comentarios",
+  viabilidadRespondidoPor: "Viabilidad — Respondido por",
+  viabilidadFechaRespuesta: "Viabilidad — Fecha respuesta",
+};
+
+let cabeceraViabilidadAsegurada = false;
+
+// Escribir con la API de Sheets fuera del ancho actual de la cuadrícula da
+// "exceeds grid limits" en vez de ampliarla sola (a diferencia de lo que
+// pasa con las filas) — hay que ampliar el nº de columnas explícitamente
+// antes de la primera escritura en las columnas nuevas de viabilidad.
+async function ensureColumnCapacity(spreadsheetId: string, tab: string, columnasNecesarias: number) {
+  const sheets = getClient();
+  if (!sheets) return;
+  const sheetId = await getSheetId(spreadsheetId, tab);
+  if (sheetId === null) return;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          updateSheetProperties: {
+            properties: { sheetId, gridProperties: { columnCount: columnasNecesarias } },
+            fields: "gridProperties.columnCount",
+          },
+        },
+      ],
+    },
+  });
+}
+
+/** Escribe la fila de cabecera de las columnas de viabilidad, solo la primera vez. */
+async function asegurarCabeceraViabilidad(spreadsheetId: string, tab: string) {
+  if (cabeceraViabilidadAsegurada) return;
+  const sheets = getClient();
+  if (!sheets) return;
+
+  await ensureColumnCapacity(spreadsheetId, tab, CENSO_TOTAL_COLUMNAS);
+
+  const data = Object.entries(CENSO_CABECERA_VIABILIDAD).map(([clave, texto]) => ({
+    range: `${tab}!${columnaALetra(CENSO_COLUMNAS_APP[clave as keyof typeof CENSO_COLUMNAS_APP])}3`,
+    values: [[texto]],
+  }));
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: { valueInputOption: "RAW", data },
+  });
+  cabeceraViabilidadAsegurada = true;
+}
 
 async function syncCenso() {
   const sheets = getClient();
@@ -593,12 +667,13 @@ async function syncCenso() {
 
   const instalaciones = await prisma.incidencia.findMany({
     where: { tipo: "INSTALACION_NUEVA", ticketExternoId: { not: null } },
-    include: { tecnico: true, estanco: true, materialesUsados: { include: { material: true } } },
+    include: { tecnico: true, estanco: true, materialesUsados: { include: { material: true } }, viabilidadRespuesta: true },
     orderBy: { fechaImportada: "desc" },
   });
   if (instalaciones.length === 0) return; // nada que sincronizar todavía
 
   await ensureTabsExist(t.spreadsheetId, [t.tab]);
+  await asegurarCabeceraViabilidad(t.spreadsheetId, t.tab);
 
   // Localizar la fila de cada SR ya presente en la hoja (columna B desde la fila 4;
   // las 3 primeras filas son cabecera/rótulo de sección).
@@ -637,6 +712,25 @@ async function syncCenso() {
       [CENSO_COLUMNAS_APP.seriePantalla]: pantalla?.numeroSerie || "",
       [CENSO_COLUMNAS_APP.informacionSolicitud]: i.descripcion || "",
       [CENSO_COLUMNAS_APP.ultimaActualizacion]: ultimaActualizacion.toLocaleString("es-ES"),
+      [CENSO_COLUMNAS_APP.viabilidadEstado]:
+        ESTADO_VIABILIDAD_LABELS[i.viabilidadEstado as keyof typeof ESTADO_VIABILIDAD_LABELS] || i.viabilidadEstado,
+      ...(i.viabilidadRespuesta
+        ? {
+            [CENSO_COLUMNAS_APP.viabilidadMaterialConfirmado]: i.viabilidadRespuesta.materialConfirmado
+              ? "Sí"
+              : `No — ${i.viabilidadRespuesta.materialCorreccion || ""}`,
+            [CENSO_COLUMNAS_APP.viabilidadUbicacion]: i.viabilidadRespuesta.tipoUbicacion === "HUECO" ? "Hueco" : "Pared",
+            [CENSO_COLUMNAS_APP.viabilidadMedidas]:
+              i.viabilidadRespuesta.tipoUbicacion === "HUECO"
+                ? `${i.viabilidadRespuesta.medidasAncho ?? "?"} x ${i.viabilidadRespuesta.medidasAlto ?? "?"} x ${i.viabilidadRespuesta.medidasFondo ?? "?"} cm`
+                : "",
+            [CENSO_COLUMNAS_APP.viabilidadPuntosElectricos]: i.viabilidadRespuesta.puntosElectricosCercanos ? "Sí" : "No",
+            [CENSO_COLUMNAS_APP.viabilidadTaladrar]: i.viabilidadRespuesta.sePuedeTaladrar ? "Sí" : "No",
+            [CENSO_COLUMNAS_APP.viabilidadComentarios]: i.viabilidadRespuesta.comentarios || "",
+            [CENSO_COLUMNAS_APP.viabilidadRespondidoPor]: i.viabilidadRespuesta.respondidoPorNombre || "",
+            [CENSO_COLUMNAS_APP.viabilidadFechaRespuesta]: i.viabilidadRespuesta.respondidoEn.toLocaleString("es-ES"),
+          }
+        : {}),
     };
 
     const filaExistente = filaPorSR.get(sr);
@@ -665,7 +759,7 @@ async function syncCenso() {
   if (filasNuevas.length > 0) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: t.spreadsheetId,
-      range: `${t.tab}!A1:AN1`,
+      range: `${t.tab}!A1:AX1`,
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values: filasNuevas },
