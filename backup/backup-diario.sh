@@ -14,7 +14,7 @@ DB_VOLUME=admira-trace_admira-db          # confirmado con `docker volume ls` (2
 HOST_UPLOADS_DIR=/data/uploads            # confirmado con `docker inspect admira-trace` (bind mount, mismo path en host y contenedor)
 HOST_SECRETO_DIR=/data/secreto            # bind mount nuevo para /data/secreto (añadir a docker-compose.yml + SECRETO_DIR en .env.production)
 STAGING_DIR=~/admira-trace-backup/staging
-REMOTE="gdrive:Admira Trace - Backups"    # remoto rclone ya configurado (ver README.md)
+REMOTE="gdrive:ADMIRA/ADMIN/ALTADIS/ADMIRA TRACE/Admira Trace - Backups"    # remoto rclone ya configurado (ver README.md) — ruta real tras moverla dentro de la estructura de Drive del equipo (2026-08-28)
 GPG_RECIPIENT="admira-trace-backup"       # UID/email de la clave pública GPG importada en el VPS
 IMAGE_TAG=admira-backup-runner
 # ===============================================================================
