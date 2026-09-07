@@ -581,7 +581,7 @@ export default function IncidenciasBoard({
         <BandejaSinAsignar incidencias={visibles} onAsignado={load} onVerDetalle={setDetalle} />
       )}
 
-      {(role === "TECNICO" || vista === "ASIGNADAS") && (
+      {(role === "TECNICO" || vista === "ASIGNADAS" || vista === "PENDIENTE_VIABILIDAD") && (
         <>
           {visibles.length === 0 && (
             <p className="text-sm text-slate-400 py-6 text-center">
