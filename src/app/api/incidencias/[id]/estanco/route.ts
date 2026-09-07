@@ -34,7 +34,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     include: { estanco: true, tecnico: true, fotos: true, materialesUsados: { include: { material: true } } },
   });
 
-  await syncToSheets("incidencias");
+  // También hay que sincronizar "censo": si es una instalación nueva, vincular
+  // el estanco cambia su dirección/CP/provincia/CIRC ahí, no solo en "incidencias".
+  await syncToSheets(["incidencias", "censo"]);
 
   return NextResponse.json({ incidencia: updated });
 }
