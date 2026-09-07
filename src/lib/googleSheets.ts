@@ -568,39 +568,59 @@ function columnaALetra(indice0: number): string {
 // celda a celda, las columnas que la app conoce con certeza; el resto de la
 // fila queda intacto. Las instalaciones que aún no estén en la hoja se
 // añaden al final, con solo esas columnas rellenas y el resto en blanco.
-// A..AN (0-39) es la hoja real del cliente, completa, sin ningún hueco libre
-// (AE-AN las usa el propio equipo: pantalla/soporte/router/Motivo Pospuesto/
-// datos del comercial/DRIVE). Las columnas de viabilidad son una ampliación
-// nueva de la hoja, a partir de AO (40) — confirmado con el usuario que sí
-// se puede ampliar el ancho del documento para esto.
+// A..AO (0-40) es la hoja real del cliente, completa, sin ningún hueco libre
+// (AF-AO las usa el propio equipo: pantalla/soporte/router/Motivo Pospuesto/
+// datos del comercial/DRIVE). La columna B "CIRC" (Domestic/Travel Retail) se
+// insertó a mano el 2026-08-28 para igualar la estructura del Excel real del
+// cliente — desplazó todo lo anterior una posición a la derecha respecto a
+// como estaba antes. Las columnas de viabilidad son una ampliación nueva de
+// la hoja, a partir de AP (41) — todavía pendiente de ampliar (ver
+// asegurarCabeceraViabilidad: la fila 3 de cabeceras está protegida y ni la
+// cuenta de servicio puede redimensionar/insertar columnas por API; hace
+// falta que alguien con permiso de editor lo haga a mano en Sheets, igual
+// que se hizo con CIRC).
 const CENSO_TOTAL_COLUMNAS = 50; // A..AX
 const CENSO_COLUMNAS_APP = {
-  sr: 1, // B
-  fechaAsignacion: 2, // C
-  estanco: 4, // E
-  direccion: 5, // F
-  codigoPostal: 6, // G
-  provincia: 7, // H
-  estado: 8, // I
-  tipo: 9, // J
-  fechaSolicitud: 10, // K
-  fechaIntervencion: 13, // N
-  instalador: 14, // O
-  serieRouter: 20, // U
-  seriePantalla: 22, // W
-  informacionSolicitud: 27, // AB
-  ultimaActualizacion: 29, // AD
+  // "Domestic" | "Travel Retail" — se escribe como fórmula (ver
+  // formulaCirc()), no como valor fijo, calcada de la del Excel real del
+  // cliente para que se recalcule sola si cambia el estanco.
+  circ: 1, // B
+  sr: 2, // C
+  fechaAsignacion: 3, // D
+  estanco: 5, // F
+  direccion: 6, // G
+  codigoPostal: 7, // H
+  provincia: 8, // I
+  estado: 9, // J
+  tipo: 10, // K
+  fechaSolicitud: 11, // L
+  fechaIntervencion: 14, // O
+  instalador: 15, // P
+  serieRouter: 21, // V
+  seriePantalla: 23, // X
+  informacionSolicitud: 28, // AC
+  ultimaActualizacion: 30, // AE
   // --- Viabilidad de instalación (ver src/lib/viabilidad.ts) ---
-  viabilidadEstado: 40, // AO
-  viabilidadMaterialConfirmado: 41, // AP
-  viabilidadUbicacion: 42, // AQ
-  viabilidadMedidas: 43, // AR
-  viabilidadPuntosElectricos: 44, // AS
-  viabilidadTaladrar: 45, // AT
-  viabilidadComentarios: 46, // AU
-  viabilidadRespondidoPor: 47, // AV
-  viabilidadFechaRespuesta: 48, // AW
+  viabilidadEstado: 41, // AP
+  viabilidadMaterialConfirmado: 42, // AQ
+  viabilidadUbicacion: 43, // AR
+  viabilidadMedidas: 44, // AS
+  viabilidadPuntosElectricos: 45, // AT
+  viabilidadTaladrar: 46, // AU
+  viabilidadComentarios: 47, // AV
+  viabilidadRespondidoPor: 48, // AW
+  viabilidadFechaRespuesta: 49, // AX
 } as const;
+
+// Misma fórmula que ya usa el Excel real del cliente para "CIRC": busca el
+// código de estanco en el directorio de comerciales y trae su segmento
+// (Domestic/Travel Retail) — el Excel real del cliente lo hace con un
+// VLOOKUP contra una pestaña interna del propio Censo ("BBDD Universo
+// Comerciales"), pero esa pestaña es un IMPORTRANGE roto (apunta a un
+// documento externo de mayo, desconectado — no depende de nosotros ni es
+// arreglable por API). Se escribe en su lugar el valor ya resuelto desde
+// `Estanco.segmento`, que es el mismo dato pero viene del directorio real
+// que la app ya sincroniza — más fiable que depender de esa conexión rota.
 
 const CENSO_CABECERA_VIABILIDAD: Partial<Record<keyof typeof CENSO_COLUMNAS_APP, string>> = {
   viabilidadEstado: "Viabilidad — Estado",
@@ -698,6 +718,7 @@ async function syncCenso() {
     const ultimaActualizacion = i.fechaResuelta || i.fechaEnCamino || i.fechaAsignacion || i.fechaImportada;
 
     const valores: Partial<Record<number, string>> = {
+      [CENSO_COLUMNAS_APP.circ]: i.estanco?.segmento || "",
       [CENSO_COLUMNAS_APP.fechaAsignacion]: i.fechaAsignacion ? i.fechaAsignacion.toLocaleDateString("es-ES") : "",
       [CENSO_COLUMNAS_APP.estanco]: i.estanco?.nombre || i.cliente || "",
       [CENSO_COLUMNAS_APP.direccion]: i.estanco?.direccion || i.direccion || "",
