@@ -693,7 +693,12 @@ async function syncCenso() {
   if (instalaciones.length === 0) return; // nada que sincronizar todavía
 
   await ensureTabsExist(t.spreadsheetId, [t.tab]);
-  await asegurarCabeceraViabilidad(t.spreadsheetId, t.tab);
+  // No bloqueante: la hoja sigue protegida contra ampliaciones de columna
+  // (ver nota en asegurarCabeceraViabilidad) — un fallo aquí no debe impedir
+  // que se sincronicen igualmente los datos normales de instalaciones.
+  await asegurarCabeceraViabilidad(t.spreadsheetId, t.tab).catch((err) =>
+    console.error("[google-sheets] No se han podido preparar las columnas de viabilidad del Censo:", err.message || err)
+  );
 
   // Localizar la fila de cada SR ya presente en la hoja (columna B desde la fila 4;
   // las 3 primeras filas son cabecera/rótulo de sección).
@@ -709,6 +714,7 @@ async function syncCenso() {
   });
 
   const dataUpdates: { range: string; values: (string | number)[][] }[] = [];
+  const dataUpdatesViabilidad: { range: string; values: (string | number)[][] }[] = [];
   const filasNuevas: (string | number)[][] = [];
 
   for (const i of instalaciones) {
@@ -757,7 +763,11 @@ async function syncCenso() {
     const filaExistente = filaPorSR.get(sr);
     if (filaExistente) {
       for (const [indice, valor] of Object.entries(valores)) {
-        dataUpdates.push({ range: `${t.tab}!${columnaALetra(Number(indice))}${filaExistente}`, values: [[valor as string]] });
+        // Las columnas de viabilidad (AP en adelante) van aparte: solo
+        // existen si alguien ya amplió la hoja a mano, y su fallo no debe
+        // impedir escribir el resto de columnas de la fila.
+        const destino = Number(indice) >= CENSO_COLUMNAS_APP.viabilidadEstado ? dataUpdatesViabilidad : dataUpdates;
+        destino.push({ range: `${t.tab}!${columnaALetra(Number(indice))}${filaExistente}`, values: [[valor as string]] });
       }
     } else {
       const fila: string[] = new Array(CENSO_TOTAL_COLUMNAS).fill("");
@@ -776,15 +786,60 @@ async function syncCenso() {
       requestBody: { valueInputOption: "RAW", data: tanda },
     });
   }
+  for (let i = 0; i < dataUpdatesViabilidad.length; i += 400) {
+    const tanda = dataUpdatesViabilidad.slice(i, i + 400);
+    await sheets.spreadsheets.values
+      .batchUpdate({ spreadsheetId: t.spreadsheetId, requestBody: { valueInputOption: "RAW", data: tanda } })
+      .catch((err) => console.error("[google-sheets] No se han podido actualizar las columnas de viabilidad (aún sin ampliar la hoja):", err.message || err));
+  }
 
   if (filasNuevas.length > 0) {
-    await sheets.spreadsheets.values.append({
+    // NO se usa values.append: su parámetro `range` solo sirve para que la
+    // API intente "detectar una tabla" — no fuerza que la escritura empiece
+    // en esa columna. Con un rango parcial como "S1:AX1" (para saltar las
+    // columnas protegidas Q/R) esto escribió los valores desplazados desde
+    // la columna A, pisando (por suerte, celdas vacías) una fila real —
+    // comprobado y corregido a mano el 2026-09-07. En su lugar: localizar la
+    // primera fila realmente vacía (columna C, SR, que toda instalación
+    // real trae) y escribir ahí con values.update, que sí respeta el rango
+    // exacto indicado.
+    const colSRCompleta = await sheets.spreadsheets.values.get({
       spreadsheetId: t.spreadsheetId,
-      range: `${t.tab}!A1:AX1`,
-      valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: { values: filasNuevas },
+      range: `${t.tab}!${colSR}4:${colSR}`,
     });
+    const primeraFilaLibre = 4 + (colSRCompleta.data.values?.length || 0);
+    const ultimaFila = primeraFilaLibre + filasNuevas.length - 1;
+
+    // Las columnas "Facturado técnico"/"Facturado Altadis" (Q,R — índices
+    // 16,17) están protegidas: cualquier escritura que las incluya, aunque
+    // vaya en blanco, la rechaza la API — se escriben en dos rangos que las saltan.
+    const COL_Q_PROTEGIDA = 16;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: t.spreadsheetId,
+      range: `${t.tab}!A${primeraFilaLibre}:P${ultimaFila}`,
+      valueInputOption: "RAW",
+      requestBody: { values: filasNuevas.map((f) => f.slice(0, COL_Q_PROTEGIDA)) },
+    });
+    // S:AO son columnas ya existentes en cualquier hoja real (ancho mínimo
+    // 41 = A..AO); AP:AX son las de viabilidad, que solo existen si alguien
+    // ya amplió la hoja a mano (ver asegurarCabeceraViabilidad) — van en un
+    // tercer bloque aparte, con su propio try/catch, para que su fallo
+    // (columnas inexistentes) no impida escribir el resto de la fila.
+    const COL_AO = 40;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: t.spreadsheetId,
+      range: `${t.tab}!S${primeraFilaLibre}:AO${ultimaFila}`,
+      valueInputOption: "RAW",
+      requestBody: { values: filasNuevas.map((f) => f.slice(COL_Q_PROTEGIDA + 2, COL_AO + 1)) },
+    });
+    await sheets.spreadsheets.values
+      .update({
+        spreadsheetId: t.spreadsheetId,
+        range: `${t.tab}!AP${primeraFilaLibre}:AX${ultimaFila}`,
+        valueInputOption: "RAW",
+        requestBody: { values: filasNuevas.map((f) => f.slice(COL_AO + 1)) },
+      })
+      .catch((err) => console.error("[google-sheets] No se han podido escribir las columnas de viabilidad (aún sin ampliar la hoja):", err.message || err));
   }
 }
 
