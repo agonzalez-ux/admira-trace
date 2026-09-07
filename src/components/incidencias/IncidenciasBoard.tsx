@@ -608,6 +608,18 @@ export default function IncidenciasBoard({
                         Pantalla desconectada
                       </span>
                     )}
+                    {/* Para saber de un vistazo, sin abrir el ticket, si toca esperar
+                        al comercial o ya hay que revisar su respuesta. */}
+                    {inc.tipo === "INSTALACION_NUEVA" && inc.viabilidadEstado === "PENDIENTE_RESPUESTA" && (
+                      <span className="text-[11px] bg-slate-100 text-slate-500 rounded-full px-2 py-0.5">
+                        ⏳ El comercial no ha contestado todavía
+                      </span>
+                    )}
+                    {inc.tipo === "INSTALACION_NUEVA" && inc.viabilidadEstado === "RESPONDIDO" && (
+                      <span className="text-[11px] bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">
+                        📝 Respondido — pendiente de revisar
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
                     {inc.ticketExternoId && <>Ticket {inc.ticketExternoId} · </>}
