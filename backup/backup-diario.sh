@@ -43,6 +43,13 @@ docker run --rm \
     npx tsx scripts/backup-fotos-diario.ts $FECHA_FOTOS /staging/fotos
   "
 docker rmi "$IMAGE_TAG" >/dev/null 2>&1 || true
+# `docker rmi` solo quita la etiqueta: las capas de compilación (npm ci,
+# node_modules, etc.) se quedan en caché y en imágenes intermedias
+# "<none>". Como esto se reconstruye desde cero cada noche, sin limpiar
+# esa caché llenó el disco del VPS al 98% en ~2 semanas (detectado y
+# arreglado a mano el 2026-09-07) — se poda aquí para que no vuelva a pasar.
+docker builder prune -af --filter "until=48h" >/dev/null 2>&1 || true
+docker image prune -af --filter "until=48h" >/dev/null 2>&1 || true
 
 # --- 1. Base de datos: snapshot diario + rotación semanal/mensual ---
 gzip -f "$STAGING_DIR/db-$FECHA.db"
