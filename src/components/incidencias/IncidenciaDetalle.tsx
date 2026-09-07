@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import {
   ESTADO_INCIDENCIA_LABELS,
   TIPO_INCIDENCIA_LABELS,
@@ -141,6 +141,29 @@ function VincularEstanco({
 }
 
 /**
+ * Visor a pantalla completa de una foto: se abre al clicar una miniatura y
+ * se cierra tocando el fondo negro de alrededor (o la propia foto), sin
+ * salir del detalle de la incidencia — antes se abría en pestaña nueva del
+ * navegador, de la que no había forma clara de "volver".
+ */
+function VisorFoto({ url, onClose }: { url: string | null; onClose: () => void }) {
+  if (!url) return null;
+  return (
+    <div
+      className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 cursor-zoom-out"
+      onClick={onClose}
+    >
+      <img
+        src={url}
+        alt="Foto ampliada"
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-full max-h-full object-contain rounded-lg cursor-default"
+      />
+    </div>
+  );
+}
+
+/**
  * Panel de viabilidad de instalación: muestra la respuesta del comercial (si
  * ya la hay) y deja a Admira marcar viable/no viable, o reenviar el
  * formulario si sigue sin respuesta.
@@ -149,10 +172,12 @@ function PanelViabilidad({
   inc,
   role,
   onActualizada,
+  onAbrirFoto,
 }: {
   inc: IncidenciaDetalleData;
   role: "TECNICO" | "ADMIRA";
   onActualizada?: (incidencia: IncidenciaDetalleData) => void;
+  onAbrirFoto: (url: string) => void;
 }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -262,9 +287,9 @@ function PanelViabilidad({
       {inc.viabilidadFotos && inc.viabilidadFotos.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           {inc.viabilidadFotos.map((f) => (
-            <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer">
+            <button key={f.id} type="button" onClick={() => onAbrirFoto(f.url)}>
               <img src={f.url} alt="Sitio de instalación" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
-            </a>
+            </button>
           ))}
         </div>
       )}
@@ -343,8 +368,10 @@ export default function IncidenciaDetalle({
   onActualizada?: (incidencia: IncidenciaDetalleData) => void;
 }) {
   const inc = incidencia;
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
   return (
+    <Fragment>
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -532,9 +559,9 @@ export default function IncidenciaDetalle({
               ) : (
                 <div className="flex gap-2 flex-wrap">
                   {inc.fotos.map((f) => (
-                    <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer">
+                    <button key={f.id} type="button" onClick={() => setFotoAmpliada(f.url)}>
                       <img src={f.url} alt="Evidencia" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}
@@ -544,10 +571,12 @@ export default function IncidenciaDetalle({
 
         {inc.tipo === "INSTALACION_NUEVA" && (inc.viabilidadEstado !== "VIABLE" || inc.viabilidadRespuesta) && (
           <div className="mt-4">
-            <PanelViabilidad inc={inc} role={role} onActualizada={onActualizada} />
+            <PanelViabilidad inc={inc} role={role} onActualizada={onActualizada} onAbrirFoto={setFotoAmpliada} />
           </div>
         )}
       </div>
     </div>
+    <VisorFoto url={fotoAmpliada} onClose={() => setFotoAmpliada(null)} />
+    </Fragment>
   );
 }
