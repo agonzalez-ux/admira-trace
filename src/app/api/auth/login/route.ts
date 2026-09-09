@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signSession, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { ROLES } from "@/lib/constants";
+import { minutosBloqueadoRestantes, registrarIntentoFallido, limpiarIntentos, obtenerIp } from "@/lib/loginAttempts";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -15,16 +16,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Usuario y contraseña son obligatorios." }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { username: String(username).toLowerCase().trim() } });
+  const ip = obtenerIp(req);
+  const usernameNormalizado = String(username).toLowerCase().trim();
+
+  const minutosRestantes = await minutosBloqueadoRestantes(usernameNormalizado, ip);
+  if (minutosRestantes !== null) {
+    return NextResponse.json(
+      { error: `Demasiados intentos fallidos. Vuelve a intentarlo en ${minutosRestantes} minuto${minutosRestantes === 1 ? "" : "s"}.` },
+      { status: 429 }
+    );
+  }
+
+  const user = await prisma.user.findUnique({ where: { username: usernameNormalizado } });
 
   if (!user || !user.active || user.role !== role) {
+    await registrarIntentoFallido(usernameNormalizado, ip);
     return NextResponse.json({ error: "Credenciales incorrectas para el rol seleccionado." }, { status: 401 });
   }
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
+    await registrarIntentoFallido(usernameNormalizado, ip);
     return NextResponse.json({ error: "Credenciales incorrectas." }, { status: 401 });
   }
+
+  await limpiarIntentos(usernameNormalizado, ip);
 
   const token = await signSession({
     userId: user.id,
