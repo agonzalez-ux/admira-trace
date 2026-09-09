@@ -8,6 +8,7 @@ import { CLOUDINARY_CONFIGURADO, subirFotoCloudinary } from "@/lib/cloudinary";
 import { syncToSheets } from "@/lib/googleSheets";
 import { actualizarFilaViabilidadEnExcel } from "@/lib/viabilidadExcel";
 import { notificarEquipoAdmira } from "@/lib/notificaciones";
+import { validarFotos } from "@/lib/fotoValidacion";
 
 /**
  * Sin sesión: es un formulario público para el comercial de un estanco, que
@@ -61,6 +62,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Indica si es un hueco o una pared." }, { status: 400 });
   }
 
+  const fotos = formData.getAll("fotos").filter((f): f is File => f instanceof File && f.size > 0);
+  const errorFotos = validarFotos(fotos);
+  if (errorFotos) return NextResponse.json({ error: errorFotos }, { status: 400 });
+
   const numOrNull = (v: FormDataEntryValue | null) => (v ? Number(v) || null : null);
   const medidasAncho = tipoUbicacion === "HUECO" ? numOrNull(formData.get("medidasAncho")) : null;
   const medidasAlto = tipoUbicacion === "HUECO" ? numOrNull(formData.get("medidasAlto")) : null;
@@ -100,7 +105,6 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const fotos = formData.getAll("fotos").filter((f): f is File => f instanceof File && f.size > 0);
   for (const file of fotos) {
     const buffer = Buffer.from(await file.arrayBuffer());
     let url: string;

@@ -6,6 +6,7 @@ import path from "path";
 import { syncToSheets } from "@/lib/googleSheets";
 import { UPLOADS_DIR } from "@/lib/uploads";
 import { CLOUDINARY_CONFIGURADO, subirFotoCloudinary } from "@/lib/cloudinary";
+import { validarFoto } from "@/lib/fotoValidacion";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -21,6 +22,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const formData = await req.formData();
   const file = formData.get("foto") as File | null;
   if (!file) return NextResponse.json({ error: "No se ha recibido ninguna foto." }, { status: 400 });
+
+  const errorValidacion = validarFoto(file);
+  if (errorValidacion) return NextResponse.json({ error: errorValidacion }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
   let url: string;
