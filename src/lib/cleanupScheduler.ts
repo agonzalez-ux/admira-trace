@@ -143,18 +143,7 @@ export async function ejecutarLimpiezaMensual(): Promise<CleanupResult> {
       resultado.errores.push(`Error limpiando backups antiguos: ${err}`);
     }
 
-    // 6. Registrar en BD (auditoría)
-    // TODO: Crear tabla CleanupLog en schema.prisma
-    // await prisma.cleanupLog.create({
-    //   data: {
-    //     fotosMovidas: resultado.fotosMovidas,
-    //     fotosEliminadas: resultado.fotosEliminadas,
-    //     backupsLimpiados: resultado.backupsLimpiados,
-    //     erroresCount: resultado.errores.length,
-    //     detalles: JSON.stringify(resultado.errores),
-    //   },
-    // });
-
+    // El registro en BD (CleanupLog) lo hace quien llama a esta función, ver más abajo.
     console.log("[cleanup] Limpieza completada", resultado);
     return resultado;
   } catch (err) {

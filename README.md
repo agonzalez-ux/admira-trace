@@ -139,6 +139,20 @@ Scripts puntuales para tareas de import/migración/diagnóstico contra la base d
 
 ---
 
+## Validación de viabilidad de instalaciones
+
+Al subir el Excel semanal, cada instalación **nueva** manda automáticamente un
+email al comercial del estanco con un enlace de un solo uso (30 días, sin
+cuenta) a `/formulario-viabilidad`, donde confirma material/tamaño, si es
+hueco o pared (con medidas), puntos eléctricos cercanos, si se puede
+taladrar, y adjunta fotos del sitio. Hasta que alguien de Admira revise la
+respuesta y la marque "Viable" desde el detalle de la instalación, esta
+queda oculta de la bandeja de asignación a técnico — vive en la pestaña
+"⏳ Pendientes de viabilidad" de Instalaciones, que además distingue de un
+vistazo si el comercial ya contestó o sigue sin responder. Ver
+`src/lib/viabilidad.ts`, `src/app/api/formulario-viabilidad/route.ts` y
+`src/components/incidencias/IncidenciaDetalle.tsx`.
+
 ## Próximas mejoras (en diseño)
 
-- **Validación de instalaciones antes de publicarlas**: al subir el Excel semanal, cada instalación nueva quedará "pendiente de validar" (no visible en la pestaña Instalaciones) hasta que el comercial del estanco responda un formulario propio (enlace de un solo uso, sin cuenta) y el equipo de Admira dé el OK manualmente desde una pantalla nueva. Pendiente de las preguntas exactas del formulario.
+- **Alerta de viabilidad estancada**: si un comercial no contesta el formulario en varios días, no hay ningún aviso adicional aparte del propio botón "Reenviar formulario" — sería fácil añadir un recordatorio automático o un indicador de "lleva X días esperando" en la lista.
