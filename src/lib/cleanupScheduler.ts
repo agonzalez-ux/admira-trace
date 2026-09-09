@@ -1,7 +1,7 @@
 /**
  * Sistema de limpieza automática mensual.
  * - Primer lunes del mes: borra fotos de incidencias resueltas
- * - Mantiene backup en /data/backups durante 1 año
+ * - Mantiene backup COMPRIMIDO (.zip) en /data/backups durante 1 año
  * - Registra cada limpieza en BD para auditoría
  */
 
@@ -11,6 +11,7 @@ import * as path from "path";
 import { promisify } from "util";
 import cron from "node-cron";
 import type { ScheduledTask } from "node-cron";
+import { ZipArchive } from "archiver";
 import { notificarEquipoAdmira } from "./notificaciones";
 
 const copyFile = promisify(fs.copyFile);
@@ -19,6 +20,25 @@ const mkdir = promisify(fs.mkdir);
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 const rmdir = promisify(fs.rmdir);
+
+/**
+ * Comprime todo el contenido de `dirOrigen` en `${dirOrigen}.zip` y borra
+ * `dirOrigen` al terminar — así el backup mensual ocupa mucho menos disco
+ * que dejando las fotos sueltas.
+ */
+async function comprimirYBorrarDirectorio(dirOrigen: string): Promise<void> {
+  const rutaZip = `${dirOrigen}.zip`;
+  await new Promise<void>((resolve, reject) => {
+    const salida = fs.createWriteStream(rutaZip);
+    const archivo = new ZipArchive({ zlib: { level: 9 } });
+    salida.on("close", resolve);
+    archivo.on("error", reject);
+    archivo.pipe(salida);
+    archivo.directory(dirOrigen, false);
+    archivo.finalize();
+  });
+  await fs.promises.rm(dirOrigen, { recursive: true, force: true });
+}
 
 const BACKUPS_DIR = process.env.BACKUPS_DIR || "/data/backups";
 const UPLOADS_DIR = process.env.UPLOADS_DIR || "/data/uploads";
@@ -100,6 +120,20 @@ export async function ejecutarLimpiezaMensual(): Promise<CleanupResult> {
       }
     }
 
+    // 3b. Comprimir el backup de fotos de este mes — mucho menos disco que
+    // dejarlas sueltas. Si no se movió ninguna foto, el directorio se creó
+    // vacío en el paso 1 y basta con borrarlo, sin generar un .zip vacío.
+    if (resultado.fotosMovidas > 0) {
+      try {
+        await comprimirYBorrarDirectorio(dirBackupMes);
+        console.log(`[cleanup] Backup comprimido: fotos-${mesActual}.zip`);
+      } catch (err) {
+        resultado.errores.push(`Error comprimiendo el backup del mes: ${err}`);
+      }
+    } else {
+      await rmdir(dirBackupMes).catch(() => {});
+    }
+
     // 4. Limpiar directorios de incidencias que quedaron vacíos
     try {
       const incidenciasDir = path.join(UPLOADS_DIR, "incidencias");
@@ -117,26 +151,28 @@ export async function ejecutarLimpiezaMensual(): Promise<CleanupResult> {
       console.warn(`[cleanup] Error limpiando directorios vacíos: ${err}`);
     }
 
-    // 5. Limpiar backups antiguos (>1 año)
+    // 5. Limpiar backups antiguos (>1 año) — soporta tanto los .zip nuevos
+    // como los directorios sueltos de backups de antes de esta mejora.
     try {
-      const backupDirs = await readdir(BACKUPS_DIR);
+      const entradasBackup = await readdir(BACKUPS_DIR);
 
-      for (const dir of backupDirs) {
-        if (!dir.startsWith("fotos-")) continue;
+      for (const nombre of entradasBackup) {
+        if (!nombre.startsWith("fotos-")) continue;
 
-        const dirPath = path.join(BACKUPS_DIR, dir);
-        const stats = await stat(dirPath);
+        const rutaCompleta = path.join(BACKUPS_DIR, nombre);
+        const stats = await stat(rutaCompleta);
         const diasAntiguedad = Math.floor((Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24));
 
         if (diasAntiguedad > RETENTION_DAYS) {
-          // Borrar directorio y su contenido
-          const files = await readdir(dirPath);
-          for (const file of files) {
-            await unlink(path.join(dirPath, file));
+          if (stats.isDirectory()) {
+            const files = await readdir(rutaCompleta);
+            for (const file of files) await unlink(path.join(rutaCompleta, file));
+            await rmdir(rutaCompleta);
+          } else {
+            await unlink(rutaCompleta);
           }
-          await rmdir(dirPath);
           resultado.backupsLimpiados++;
-          console.log(`[cleanup] Backup antiguo eliminado: ${dir} (${diasAntiguedad} días)`);
+          console.log(`[cleanup] Backup antiguo eliminado: ${nombre} (${diasAntiguedad} días)`);
         }
       }
     } catch (err) {

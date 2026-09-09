@@ -10,7 +10,7 @@ Admira Trace incluye un sistema automatizado que limpia las fotos de incidencias
 - **Cuándo:** Primer lunes de cada mes a las 00:00 (medianoche)
 - **Qué hace:**
   - Busca todas las incidencias con estado `RESUELTA`
-  - Copia sus fotos a `/data/backups/fotos-YYYY-MM/`
+  - Copia sus fotos a `/data/backups/fotos-YYYY-MM/` y las comprime en `fotos-YYYY-MM.zip` (2026-09: se dejó de guardarlas sueltas para ahorrar disco)
   - Elimina los archivos originales de `/data/uploads/`
   - Limpia directorios vacíos
   - Elimina backups más antiguos de 12 meses
@@ -80,15 +80,16 @@ Cada limpieza se registra en la tabla `CleanupLog`:
 
 ```
 /data/backups/
-├── fotos-2026-01/       # Enero 2026
-│   ├── incidencia-1-foto1.jpg
-│   ├── incidencia-1-foto2.jpg
-│   └── incidencia-3-foto1.jpg
-├── fotos-2026-02/       # Febrero 2026
-│   └── ...
-└── fotos-2026-08/       # Agosto 2026
-    └── ...
+├── fotos-2026-01.zip     # Enero 2026 (comprimido)
+├── fotos-2026-02.zip     # Febrero 2026
+└── fotos-2026-08.zip     # Agosto 2026
 ```
+
+Cada .zip contiene las fotos sueltas (`incidencia-1-foto1.jpg`, etc.) tal como
+antes, solo que comprimidas en un único archivo por mes — mismo contenido,
+mucho menos espacio en disco. Los backups de meses anteriores a esta mejora
+siguen siendo carpetas sin comprimir; el sistema los sigue gestionando igual
+(incluida su limpieza al año) hasta que caduquen.
 
 **Retención:** Se eliminan automáticamente después de 12 meses.
 
@@ -186,7 +187,7 @@ El scheduler verifica CADA DÍA si es el primer lunes del mes. Si sí, ejecuta l
 
 Si necesitas recuperar una foto que fue borrada:
 
-1. Accede a `/data/backups/fotos-YYYY-MM/` en el servidor
+1. Descomprime `/data/backups/fotos-YYYY-MM.zip` del mes correspondiente
 2. Busca el archivo por ID de incidencia: `{incidenciaId}-{filename}`
 3. Copiar de vuelta a `/data/uploads/incidencias/{incidenciaId}/`
 
@@ -228,7 +229,6 @@ Si necesitas recuperar una foto que fue borrada:
 ## Mantenimiento Futuro
 
 Mejoras planificadas:
-- [ ] Compresión de backups (ZIP/TAR)
 - [ ] Notificaciones por email cuando se complete la limpieza
 - [ ] Descarga de backups desde el dashboard
 - [ ] Estadísticas visuales de espacio liberado
