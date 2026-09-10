@@ -297,6 +297,7 @@ model Incidencia {
   creadoPor       User?     @relation("IncidenciaCreadoPor", fields: [creadoPorId], references: [id])
   fechaAsignacion DateTime?
   fechaEnCamino   DateTime?
+  fechaEnSitio    DateTime?
   fechaResuelta   DateTime?
   fechaImportada  DateTime  @default(now())
 

@@ -24,6 +24,7 @@ export type IncidenciaDetalleData = {
   estado: string;
   fechaAsignacion: string | null;
   fechaEnCamino: string | null;
+  fechaEnSitio?: string | null;
   fechaResuelta: string | null;
   fechaVisitaProgramada?: string | null;
   fechaImportada?: string | null;
@@ -322,6 +323,7 @@ const ESTADO_COLORS: Record<string, string> = {
   SIN_ASIGNAR: "bg-slate-200 text-slate-700",
   ASIGNADA: "bg-amber-100 text-amber-800",
   EN_CAMINO: "bg-blue-100 text-blue-800",
+  EN_SITIO: "bg-indigo-100 text-indigo-800",
   RESUELTA: "bg-emerald-100 text-emerald-800",
 };
 
@@ -337,6 +339,7 @@ function Timeline({ inc }: { inc: IncidenciaDetalleData }) {
     { label: "Asignada al técnico", fecha: fmt(inc.fechaAsignacion) },
     { label: "Visita programada", fecha: fmt(inc.fechaVisitaProgramada) },
     { label: "Técnico en camino", fecha: fmt(inc.fechaEnCamino) },
+    { label: "Técnico en el estanco", fecha: fmt(inc.fechaEnSitio) },
     { label: "Resuelta", fecha: fmt(inc.fechaResuelta) },
   ];
 

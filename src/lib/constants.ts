@@ -143,13 +143,14 @@ export const TIPO_INCIDENCIA_LABELS: Record<TipoIncidencia, string> = {
   MANTENIMIENTO: "Mantenimiento",
 };
 
-export const ESTADOS_INCIDENCIA = ["SIN_ASIGNAR", "ASIGNADA", "EN_CAMINO", "RESUELTA"] as const;
+export const ESTADOS_INCIDENCIA = ["SIN_ASIGNAR", "ASIGNADA", "EN_CAMINO", "EN_SITIO", "RESUELTA"] as const;
 export type EstadoIncidencia = (typeof ESTADOS_INCIDENCIA)[number];
 
 export const ESTADO_INCIDENCIA_LABELS: Record<EstadoIncidencia, string> = {
   SIN_ASIGNAR: "Sin asignar",
   ASIGNADA: "Asignada",
   EN_CAMINO: "En camino",
+  EN_SITIO: "En el estanco",
   RESUELTA: "Resuelta",
 };
 

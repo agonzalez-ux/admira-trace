@@ -36,6 +36,7 @@ const ESTADO_COLORS: Record<string, string> = {
   SIN_ASIGNAR: "bg-slate-200 text-slate-700",
   ASIGNADA: "bg-amber-100 text-amber-800",
   EN_CAMINO: "bg-blue-100 text-blue-800",
+  EN_SITIO: "bg-indigo-100 text-indigo-800",
   RESUELTA: "bg-emerald-100 text-emerald-800",
 };
 
@@ -497,7 +498,7 @@ export default function IncidenciasBoard({
     }
   }
 
-  async function setEstado(id: string, estado: "EN_CAMINO" | "RESUELTA") {
+  async function setEstado(id: string, estado: "EN_CAMINO" | "EN_SITIO" | "RESUELTA") {
     const res = await fetch(`/api/incidencias/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -730,8 +731,13 @@ export default function IncidenciasBoard({
                     </button>
                   )}
                   {inc.estado === "EN_CAMINO" && (
+                    <button onClick={() => setEstado(inc.id, "EN_SITIO")} className="bg-indigo-600 text-white text-xs font-medium rounded-lg px-3 py-2">
+                      📍 He llegado al estanco
+                    </button>
+                  )}
+                  {inc.estado === "EN_SITIO" && (
                     <button onClick={() => setEstado(inc.id, "RESUELTA")} className="bg-emerald-600 text-white text-xs font-medium rounded-lg px-3 py-2">
-                      ✅ Marcar resuelta
+                      ✅ Ticket resuelto
                     </button>
                   )}
                   <button onClick={() => setScanTarget(inc.id)} className="bg-admira-600 text-white text-xs font-medium rounded-lg px-3 py-2">
