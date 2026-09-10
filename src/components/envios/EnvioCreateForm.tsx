@@ -18,7 +18,7 @@ import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 
 const GLS_PORTAL_URL = process.env.NEXT_PUBLIC_GLS_PORTAL_URL || "";
 
-type Tecnico = { id: string; name: string; zona: string | null; direccion: string | null };
+type Tecnico = { id: string; name: string; zona: string | null; direccion: string | null; colaboraAltadis?: boolean };
 type Material = { id: string; tipo: string };
 type LineaOtro = { descripcion: string; cantidad: number };
 

@@ -5,7 +5,7 @@ import { TIPO_INCIDENCIA_LABELS, TIPOS_INCIDENCIA, PROYECTOS, PROYECTO_LABELS, P
 import TecnicoCombobox from "@/components/tecnicos/TecnicoCombobox";
 import { useProyecto } from "@/lib/proyectoContext";
 
-type Tecnico = { id: string; name: string; zona: string | null };
+type Tecnico = { id: string; name: string; zona: string | null; colaboraAltadis?: boolean; esInstalador?: boolean };
 
 export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => void }) {
   const { proyecto: proyectoActual } = useProyecto();
@@ -104,6 +104,7 @@ export default function IncidenciaCreateForm({ onCreated }: { onCreated: () => v
           onChange={setTecnicoId}
           placeholder="Buscar técnico por nombre o ciudad…"
           className="text-sm"
+          avisarSiNoInstalador={tipo === "INSTALACION_NUEVA"}
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

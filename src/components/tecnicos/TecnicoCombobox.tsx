@@ -8,6 +8,8 @@ export type OpcionTecnico = {
   zona: string | null;
   distanciaKm?: number | null;
   destacar?: boolean;
+  colaboraAltadis?: boolean;
+  esInstalador?: boolean;
 };
 
 // Para que buscar "jaen" encuentre "Jaén", "malaga" encuentre "Málaga", etc. —
@@ -19,10 +21,23 @@ function normalizar(s: string): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
-function etiqueta(t: OpcionTecnico): string {
+/**
+ * No se oculta a nadie del selector, pero si no colabora con Admira (o, en
+ * una instalación nueva, si no está marcado como instalador) se avisa
+ * claramente para que quien asigna lo sepa y decida con conocimiento.
+ */
+function advertencia(t: OpcionTecnico, avisarSiNoInstalador: boolean): string | null {
+  const partes: string[] = [];
+  if (t.colaboraAltadis === false) partes.push("No colabora con Admira");
+  if (avisarSiNoInstalador && t.esInstalador === false) partes.push("no es instalador");
+  return partes.length > 0 ? partes.join(" · ") : null;
+}
+
+function etiqueta(t: OpcionTecnico, avisarSiNoInstalador: boolean): string {
+  const adv = advertencia(t, avisarSiNoInstalador);
   return `${t.destacar ? "⭐ " : ""}${t.name}${t.zona ? ` · ${t.zona}` : ""}${
     t.distanciaKm != null ? ` — ${t.distanciaKm} km` : ""
-  }`;
+  }${adv ? ` ⚠️ ${adv}` : ""}`;
 }
 
 /**
@@ -36,12 +51,15 @@ export default function TecnicoCombobox({
   onChange,
   placeholder = "Buscar técnico por nombre o ciudad…",
   className = "",
+  avisarSiNoInstalador = false,
 }: {
   tecnicos: OpcionTecnico[];
   value: string;
   onChange: (tecnicoId: string) => void;
   placeholder?: string;
   className?: string;
+  /** Instalación nueva: además de "no colabora", avisa si no está marcado como instalador. */
+  avisarSiNoInstalador?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -79,7 +97,7 @@ export default function TecnicoCombobox({
     <div ref={contenedorRef} className="relative">
       <input
         type="text"
-        value={open ? query : seleccionado ? etiqueta(seleccionado) : ""}
+        value={open ? query : seleccionado ? etiqueta(seleccionado, avisarSiNoInstalador) : ""}
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
@@ -107,22 +125,26 @@ export default function TecnicoCombobox({
           {filtrados.length === 0 ? (
             <p className="text-xs text-slate-400 px-2 py-2">No hay técnicos que coincidan.</p>
           ) : (
-            filtrados.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onMouseDown={(e) => {
-                  // onMouseDown (no onClick) para que dispare antes del blur del input.
-                  e.preventDefault();
-                  elegir(t.id);
-                }}
-                className={`w-full text-left text-xs px-2 py-1.5 hover:bg-admira-50 ${
-                  t.id === value ? "bg-admira-50 font-medium" : ""
-                }`}
-              >
-                {etiqueta(t)}
-              </button>
-            ))
+            filtrados.map((t) => {
+              const adv = advertencia(t, avisarSiNoInstalador);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    // onMouseDown (no onClick) para que dispare antes del blur del input.
+                    e.preventDefault();
+                    elegir(t.id);
+                  }}
+                  className={`w-full text-left text-xs px-2 py-1.5 hover:bg-admira-50 ${
+                    t.id === value ? "bg-admira-50 font-medium" : ""
+                  } ${adv ? "text-red-600" : ""}`}
+                  title={adv || undefined}
+                >
+                  {etiqueta(t, avisarSiNoInstalador)}
+                </button>
+              );
+            })
           )}
         </div>
       )}

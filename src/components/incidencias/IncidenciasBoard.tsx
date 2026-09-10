@@ -14,9 +14,16 @@ import { useProyecto } from "@/lib/proyectoContext";
 
 type Foto = { id: string; url: string; fecha: string };
 type MaterialUsado = { id: string; material: { numeroSerie: string; nombre: string; tipo: string } };
-type Tecnico = { id: string; name: string; zona: string | null; phone: string | null };
+type Tecnico = { id: string; name: string; zona: string | null; phone: string | null; colaboraAltadis?: boolean; esInstalador?: boolean };
 type EstancoInfo = { nombre: string; comercial: string | null; correoComercial: string | null };
-type TecnicoCercano = { id: string; name: string; zona: string | null; distanciaKm: number | null };
+type TecnicoCercano = {
+  id: string;
+  name: string;
+  zona: string | null;
+  distanciaKm: number | null;
+  colaboraAltadis?: boolean;
+  esInstalador?: boolean;
+};
 
 type Incidencia = IncidenciaDetalleData & {
   fotos: Foto[];
@@ -43,11 +50,13 @@ function SelectorTecnicoCercano({
   valor,
   onChange,
   tecnicosBase,
+  esInstalacion,
 }: {
   incidenciaId: string;
   valor: string;
   onChange: (tecnicoId: string) => void;
   tecnicosBase: Tecnico[];
+  esInstalacion: boolean;
 }) {
   const [tecnicos, setTecnicos] = useState<TecnicoCercano[] | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -72,7 +81,15 @@ function SelectorTecnicoCercano({
   }
 
   const lista: TecnicoCercano[] =
-    tecnicos ?? tecnicosBase.map((t) => ({ id: t.id, name: t.name, zona: t.zona, distanciaKm: null }));
+    tecnicos ??
+    tecnicosBase.map((t) => ({
+      id: t.id,
+      name: t.name,
+      zona: t.zona,
+      distanciaKm: null,
+      colaboraAltadis: t.colaboraAltadis,
+      esInstalador: t.esInstalador,
+    }));
 
   const opciones = lista.map((t, idx) => ({
     ...t,
@@ -86,6 +103,7 @@ function SelectorTecnicoCercano({
         value={valor}
         onChange={onChange}
         placeholder="Técnico…"
+        avisarSiNoInstalador={esInstalacion}
       />
       {tecnicos === null ? (
         <button
@@ -240,6 +258,7 @@ function BandejaSinAsignar({
                   valor={seleccion[inc.id] || ""}
                   onChange={(tecnicoId) => setSeleccion((s) => ({ ...s, [inc.id]: tecnicoId }))}
                   tecnicosBase={tecnicosBase}
+                  esInstalacion={inc.tipo === "INSTALACION_NUEVA"}
                 />
               </div>
               <button

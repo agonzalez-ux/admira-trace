@@ -15,15 +15,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   });
   if (!incidencia) return NextResponse.json({ error: "Incidencia no encontrada." }, { status: 404 });
 
-  // Para instalaciones nuevas hace falta además que el técnico esté marcado
-  // como instalador ("INSTALADOR" en la hoja de técnicos) — para el resto de
-  // incidencias basta con que colabore con Altadis.
-  const where: any = { role: "TECNICO", active: true, colaboraAltadis: true };
-  if (incidencia.tipo === "INSTALACION_NUEVA") where.esInstalador = true;
-
+  // No se oculta a nadie: se devuelven todos, con colaboraAltadis/esInstalador
+  // para que el frontend avise (sin bloquear) si el técnico no colabora, o si
+  // es una instalación nueva y el técnico no está marcado como instalador.
   const tecnicos = await prisma.user.findMany({
-    where,
-    select: { id: true, name: true, zona: true, direccion: true, lat: true, lon: true },
+    where: { role: "TECNICO", active: true },
+    select: { id: true, name: true, zona: true, direccion: true, lat: true, lon: true, colaboraAltadis: true, esInstalador: true },
     orderBy: { name: "asc" },
   });
 
@@ -33,7 +30,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   if (!coordsIncidencia) {
     return NextResponse.json({
-      tecnicos: tecnicos.map((t) => ({ id: t.id, name: t.name, zona: t.zona, distanciaKm: null })),
+      tecnicos: tecnicos.map((t) => ({
+        id: t.id,
+        name: t.name,
+        zona: t.zona,
+        distanciaKm: null,
+        colaboraAltadis: t.colaboraAltadis,
+        esInstalador: t.esInstalador,
+      })),
+      esInstalacion: incidencia.tipo === "INSTALACION_NUEVA",
       motivoSinDistancia: incidencia.estancoId
         ? "No se han podido obtener las coordenadas del estanco."
         : "No vinculada a ningún estanco: ábrela y vincúlalo a mano para ver las distancias.",
@@ -51,6 +56,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     name: t.name,
     zona: t.zona,
     distanciaKm: t.lat !== null && t.lon !== null ? Math.round(distanciaKm(coordsIncidencia, { lat: t.lat, lon: t.lon })) : null,
+    colaboraAltadis: t.colaboraAltadis,
+    esInstalador: t.esInstalador,
   }));
 
   rellenarCoordsTecnicosEnSegundoPlano(tecnicos.filter((t) => t.lat === null || t.lon === null).map((t) => t.id));
@@ -62,5 +69,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return a.distanciaKm - b.distanciaKm;
   });
 
-  return NextResponse.json({ tecnicos: conDistancia, motivoSinDistancia: null });
+  return NextResponse.json({
+    tecnicos: conDistancia,
+    esInstalacion: incidencia.tipo === "INSTALACION_NUEVA",
+    motivoSinDistancia: null,
+  });
 }
