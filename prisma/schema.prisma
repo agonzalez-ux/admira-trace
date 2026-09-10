@@ -61,6 +61,16 @@ model User {
   // pestañas de técnicos habituales (España/Portugal) — proveedores externos
   // que no forman parte de la red de técnicos propia.
   esExterno         Boolean  @default(false)
+  // Columna "COLABORA CON ALTADIS" (J) de la hoja "New Técnicos": si es
+  // "No", el técnico se sigue viendo en el directorio (con toda su info)
+  // pero no debe aparecer como opción al asignar incidencias ni
+  // instalaciones. Default true para no ocultar de golpe a nadie ya
+  // existente hasta que se re-ejecute el import con este campo.
+  colaboraAltadis   Boolean  @default(true)
+  // Columna "INSTALADOR" (AG) de la hoja "New Técnicos" — checkbox real,
+  // solo existe en la pestaña "Técnicos España". Hace falta además de
+  // colaboraAltadis=true para poder asignar instalaciones nuevas.
+  esInstalador      Boolean  @default(false)
   // Coordenadas geocodificadas de `direccion` (OpenStreetMap/Nominatim), para
   // calcular la distancia aproximada a cada incidencia.
   lat       Float?

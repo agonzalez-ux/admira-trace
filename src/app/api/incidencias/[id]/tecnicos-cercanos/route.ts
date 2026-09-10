@@ -15,8 +15,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   });
   if (!incidencia) return NextResponse.json({ error: "Incidencia no encontrada." }, { status: 404 });
 
+  // Para instalaciones nuevas hace falta además que el técnico esté marcado
+  // como instalador ("INSTALADOR" en la hoja de técnicos) — para el resto de
+  // incidencias basta con que colabore con Altadis.
+  const where: any = { role: "TECNICO", active: true, colaboraAltadis: true };
+  if (incidencia.tipo === "INSTALACION_NUEVA") where.esInstalador = true;
+
   const tecnicos = await prisma.user.findMany({
-    where: { role: "TECNICO", active: true },
+    where,
     select: { id: true, name: true, zona: true, direccion: true, lat: true, lon: true },
     orderBy: { name: "asc" },
   });

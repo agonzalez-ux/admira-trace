@@ -16,6 +16,8 @@ type Tecnico = {
   personaContacto: string | null;
   radioCobertura: string | null;
   esExterno: boolean;
+  colaboraAltadis: boolean;
+  esInstalador: boolean;
   numMaterialDisponible: number;
   numIncidenciasPendientes: number;
 };
@@ -120,6 +122,14 @@ export default function TecnicosList() {
                 {t.esExterno && (
                   <span className="text-[10px] bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 shrink-0" title="Proveedor externo, no de la red de técnicos habitual">
                     Externo
+                  </span>
+                )}
+                {!t.colaboraAltadis && (
+                  <span
+                    className="text-[10px] bg-red-100 text-red-700 rounded-full px-2 py-0.5 shrink-0"
+                    title="No colabora con Admira: no aparece como opción al asignar incidencias ni instalaciones"
+                  >
+                    No colabora con Admira
                   </span>
                 )}
                 {hayCoincidenciaDireccion && idx === 0 && (

@@ -36,6 +36,8 @@ type Detalle = {
     costeKm: string | null;
     condiciones: string | null;
     esExterno: boolean;
+    colaboraAltadis: boolean;
+    esInstalador: boolean;
   };
   materiales: Material[];
   enviosPendientes: EnvioPendiente[];
@@ -99,6 +101,14 @@ export default function TecnicoFichaModal({ tecnicoId, onClose }: { tecnicoId: s
                   {detalle?.tecnico.esExterno && (
                     <span className="text-[10px] font-normal bg-amber-100 text-amber-700 rounded-full px-2 py-0.5" title="Proveedor externo, no de la red de técnicos habitual">
                       Externo
+                    </span>
+                  )}
+                  {detalle && !detalle.tecnico.colaboraAltadis && (
+                    <span
+                      className="text-[10px] font-normal bg-red-100 text-red-700 rounded-full px-2 py-0.5"
+                      title="No colabora con Admira: no aparece como opción al asignar incidencias ni instalaciones"
+                    >
+                      No colabora con Admira
                     </span>
                   )}
                 </h2>

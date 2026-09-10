@@ -14,6 +14,8 @@ const SELECT_TECNICO = {
   personaContacto: true,
   radioCobertura: true,
   esExterno: true,
+  colaboraAltadis: true,
+  esInstalador: true,
   materiales: { where: { estado: "EN_TECNICO" }, select: { id: true } },
   incidenciasAsig: { where: { estado: { not: "RESUELTA" } }, select: { id: true } },
 } as const;
@@ -30,6 +32,8 @@ function aResultado(t: any) {
     personaContacto: t.personaContacto,
     radioCobertura: t.radioCobertura,
     esExterno: t.esExterno,
+    colaboraAltadis: t.colaboraAltadis,
+    esInstalador: t.esInstalador,
     numMaterialDisponible: t.materiales.length,
     numIncidenciasPendientes: t.incidenciasAsig.length,
   };

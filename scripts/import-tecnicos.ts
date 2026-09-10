@@ -6,6 +6,14 @@
  * alta igual y funcionan exactamente igual (se pueden asignar a cualquier
  * incidencia), solo se distinguen con un distintivo en el listado.
  *
+ * También se importa `colaboraAltadis` (columna "COLABORA CON ALTADIS",
+ * las 3 pestañas) y `esInstalador` (columna "INSTALADOR", checkbox real que
+ * solo existe en "Técnicos España" — las instalaciones son solo Península).
+ * Un técnico con colaboraAltadis=false sigue viendo toda su info en el
+ * directorio de Admira, pero no aparece como opción al asignar incidencias
+ * ni instalaciones; esInstalador=false además lo excluye de instalaciones
+ * aunque sí colabore. Ver `src/app/api/incidencias/[id]/tecnicos-cercanos/route.ts`.
+ *
  * Uso: node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/import-tecnicos.ts
  *
  * Cada técnico recibe un usuario derivado de su email (parte antes de la @) y
@@ -37,7 +45,14 @@ type Fila = {
   radioCobertura: string;
   costeKm: string;
   condiciones: string;
+  colaboraAltadis: boolean;
+  esInstalador: boolean;
 };
+
+/** "Si"/"Sí"/"SI" → true; "No", vacío o cualquier otra cosa → false. */
+function esSi(v: string): boolean {
+  return v.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") === "si";
+}
 
 function limpiar(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -77,7 +92,8 @@ async function generarUsername(empresa: string, usados: Set<string>): Promise<st
 }
 
 async function leerHoja(sheets: any, tab: string, offsetCol: number): Promise<Fila[]> {
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A1:P400` });
+  // Hasta AZ: "Técnicos España" trae columnas útiles hasta AG ("INSTALADOR").
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A1:AZ400` });
   const rows: unknown[][] = res.data.values || [];
 
   // Localizar la fila de cabeceras (la que contiene "EMAIL").
@@ -101,6 +117,9 @@ async function leerHoja(sheets: any, tab: string, offsetCol: number): Promise<Fi
   const iRadio = col("RADIO DE COBERTURA SIN COSTE");
   const iCoste = col("COSTE KM");
   const iCond = cabecera.findIndex((c) => c === "CONDICIONES" || c === "COMENTARIO");
+  const iColabora = col("COLABORA CON ALTADIS");
+  // Solo existe en "Técnicos España" — las instalaciones son solo Península.
+  const iInstalador = col("INSTALADOR");
 
   const filas: Fila[] = [];
   for (let r = idxCabecera + 1; r < rows.length; r++) {
@@ -120,6 +139,8 @@ async function leerHoja(sheets: any, tab: string, offsetCol: number): Promise<Fi
       radioCobertura: iRadio >= 0 ? limpiar(row[iRadio]) : "",
       costeKm: iCoste >= 0 ? limpiar(row[iCoste]) : "",
       condiciones: iCond >= 0 ? limpiar(row[iCond]) : "",
+      colaboraAltadis: iColabora >= 0 ? esSi(limpiar(row[iColabora])) : true,
+      esInstalador: iInstalador >= 0 ? limpiar(row[iInstalador]).toUpperCase() === "TRUE" : false,
     });
   }
   return filas;
@@ -182,6 +203,8 @@ async function main() {
       costeKm: f.costeKm || null,
       condiciones: f.condiciones || null,
       esExterno,
+      colaboraAltadis: f.colaboraAltadis,
+      esInstalador: f.esInstalador,
     };
 
     // Se busca por nombre de empresa: es el identificador estable entre
@@ -212,7 +235,10 @@ async function main() {
     creados += 1;
   }
 
+  const noColaboran = todas.filter((t) => primerEmail(t.f.email) && !t.f.colaboraAltadis).length;
+  const instaladores = todas.filter((t) => primerEmail(t.f.email) && t.f.esInstalador).length;
   console.log(`\nImportación completada: ${creados} creados, ${actualizados} actualizados, ${sinEmail} saltados (sin email).`);
+  console.log(`  De ellos, ${noColaboran} marcados como "No colabora con Altadis" y ${instaladores} como instaladores.`);
 
   if (credenciales.length > 0) {
     console.log("\n=== CREDENCIALES TEMPORALES (comunicar a cada técnico) ===");

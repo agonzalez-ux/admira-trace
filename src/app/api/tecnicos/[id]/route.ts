@@ -25,6 +25,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       costeKm: true,
       condiciones: true,
       esExterno: true,
+      colaboraAltadis: true,
+      esInstalador: true,
       createdAt: true,
     },
   });
