@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import ImportarDatos from '@/components/ImportarDatos';
 
 export default async function ImportarDatosPage() {
@@ -12,6 +13,12 @@ export default async function ImportarDatosPage() {
     <main className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
+          <Link
+            href="/admira"
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4"
+          >
+            ← Volver
+          </Link>
           <h1 className="text-4xl font-bold text-gray-900">📤 Importar / Actualizar Datos</h1>
           <p className="text-gray-600 mt-2">
             Sube los Excels mensuales y semanales para mantener los datos sincronizados automáticamente.
