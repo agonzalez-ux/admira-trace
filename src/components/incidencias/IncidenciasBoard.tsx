@@ -766,8 +766,8 @@ export default function IncidenciasBoard({
                   {inc.tipo === "INSTALACION_NUEVA" && (
                     <WhatsAppButton
                       phone={WHATSAPP_PHONE}
-                      text={`Hola, os envío la foto del código QR de Admira de la nueva instalación: "${inc.titulo}" (${inc.cliente || ""}).`}
-                      label="Enviar foto QR de Admira"
+                      text={`Hola, os envío la foto de la API key (la que sale debajo del QR) de la nueva instalación: "${inc.titulo}" (${inc.cliente || ""}).`}
+                      label="Enviar foto de la API key"
                     />
                   )}
                 </div>

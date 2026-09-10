@@ -22,13 +22,13 @@ function normalizar(s: string): string {
 }
 
 /**
- * No se oculta a nadie del selector, pero si no colabora con Admira (o, en
+ * No se oculta a nadie del selector, pero si no colabora con Altadis (o, en
  * una instalación nueva, si no está marcado como instalador) se avisa
  * claramente para que quien asigna lo sepa y decida con conocimiento.
  */
 function advertencia(t: OpcionTecnico, avisarSiNoInstalador: boolean): string | null {
   const partes: string[] = [];
-  if (t.colaboraAltadis === false) partes.push("No colabora con Admira");
+  if (t.colaboraAltadis === false) partes.push("No colabora con Altadis");
   if (avisarSiNoInstalador && t.esInstalador === false) partes.push("no es instalador");
   return partes.length > 0 ? partes.join(" · ") : null;
 }

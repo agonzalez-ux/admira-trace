@@ -29,8 +29,10 @@ export function obtenerNumeroWhatsAppRotativo(incidenciaId: string): string {
 
 /**
  * Genera el mensaje de WhatsApp que el propio técnico envía a Admira al
- * terminar una instalación, adjuntando la foto del QR. Va en primera
- * persona porque quien lo manda es el técnico, no un tercero avisándole.
+ * terminar una instalación, adjuntando la foto de la API key que sale
+ * debajo del QR (no el QR en sí, que no aporta nada por WhatsApp — lo que
+ * hace falta leer es esa clave). Va en primera persona porque quien lo
+ * manda es el técnico, no un tercero avisándole.
  */
 export function generarMensajeInstalacion({
   tecnicoNombre,
@@ -49,7 +51,7 @@ export function generarMensajeInstalacion({
 
 He terminado la instalación en *${estanco}${direccion}*.
 
-Os adjunto la foto del QR de Admira.
+Os adjunto la foto de la API key que sale debajo del QR.
 
 Gracias.`;
 }

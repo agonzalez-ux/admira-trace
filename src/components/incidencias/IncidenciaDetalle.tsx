@@ -499,11 +499,12 @@ export default function IncidenciaDetalle({
             )}
 
             {/* Botón de WhatsApp para instalaciones: lo usa el propio técnico
-                para enviar a Admira la foto del QR, sin salir de la incidencia. */}
+                para enviar a Admira la foto de la API key que sale debajo
+                del QR (no el QR en sí), sin salir de la incidencia. */}
             {inc.tipo === "INSTALACION_NUEVA" && inc.tecnico && role === "TECNICO" && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                 <p className="text-xs text-emerald-800 mb-2">
-                  💬 Envía a Admira la foto del QR de esta instalación por WhatsApp:
+                  💬 Envía a Admira la foto de la API key (la que sale debajo del QR) de esta instalación por WhatsApp:
                 </p>
                 <WhatsAppButton
                   phone={obtenerNumeroWhatsAppRotativo(inc.id)}
@@ -512,7 +513,7 @@ export default function IncidenciaDetalle({
                     estancoNombre: inc.estanco?.nombre,
                     estancoDireccion: inc.direccion ?? undefined,
                   })}
-                  label="📤 Enviar QR Admira"
+                  label="📤 Enviar API key a Admira"
                 />
               </div>
             )}

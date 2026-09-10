@@ -107,9 +107,9 @@ export default function TecnicoFichaModal({ tecnicoId, onClose }: { tecnicoId: s
                   {detalle && !detalle.tecnico.colaboraAltadis && (
                     <span
                       className="text-[10px] font-normal bg-red-100 text-red-700 rounded-full px-2 py-0.5"
-                      title="No colabora con Admira: no aparece como opción al asignar incidencias ni instalaciones"
+                      title="No colabora con Altadis: al asignarle una incidencia o instalación sale marcado con un aviso"
                     >
-                      No colabora con Admira
+                      No colabora con Altadis
                     </span>
                   )}
                 </h2>
