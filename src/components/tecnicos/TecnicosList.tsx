@@ -30,6 +30,8 @@ export default function TecnicosList() {
   const [direccionRef, setDireccionRef] = useState("");
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [sinActividadEnProyecto, setSinActividadEnProyecto] = useState(false);
+  const [soloColaboran, setSoloColaboran] = useState(false);
+  const [soloInstaladores, setSoloInstaladores] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -45,6 +47,8 @@ export default function TecnicosList() {
 
   const visibles = useMemo(() => {
     let lista = tecnicos;
+    if (soloColaboran) lista = lista.filter((t) => t.colaboraAltadis);
+    if (soloInstaladores) lista = lista.filter((t) => t.esInstalador);
     if (busqueda.trim()) {
       const q = busqueda.trim().toLowerCase();
       lista = lista.filter(
@@ -67,7 +71,7 @@ export default function TecnicosList() {
     }
 
     return lista;
-  }, [tecnicos, busqueda, direccionRef]);
+  }, [tecnicos, busqueda, direccionRef, soloColaboran, soloInstaladores]);
 
   if (loading) return <p className="text-sm text-slate-400 py-4">Cargando técnicos…</p>;
 
@@ -104,6 +108,42 @@ export default function TecnicosList() {
             <p className="text-[11px] text-slate-400 mt-1">
               Ordenado por coincidencia de zona / dirección con lo escrito.
             </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSoloColaboran((v) => !v)}
+            className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
+              soloColaboran
+                ? "bg-emerald-600 border-emerald-600 text-white"
+                : "bg-white border-slate-300 text-slate-600 hover:border-emerald-300"
+            }`}
+          >
+            ✅ Colabora con Altadis
+          </button>
+          <button
+            type="button"
+            onClick={() => setSoloInstaladores((v) => !v)}
+            className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
+              soloInstaladores
+                ? "bg-indigo-600 border-indigo-600 text-white"
+                : "bg-white border-slate-300 text-slate-600 hover:border-indigo-300"
+            }`}
+          >
+            🔧 Hacen instalaciones
+          </button>
+          {(soloColaboran || soloInstaladores) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSoloColaboran(false);
+                setSoloInstaladores(false);
+              }}
+              className="text-xs text-slate-400 hover:text-slate-600 underline px-1"
+            >
+              Quitar filtros
+            </button>
           )}
         </div>
       </div>
