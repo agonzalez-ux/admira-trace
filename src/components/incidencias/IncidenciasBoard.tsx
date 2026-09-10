@@ -277,8 +277,32 @@ function BandejaSinAsignar({
   );
 }
 
-function ProgramarVisita({ incidenciaId, onProgramada }: { incidenciaId: string; onProgramada: () => void }) {
-  const [fechaHora, setFechaHora] = useState("");
+/** "2026-09-10T08:30" en hora local, para precargar el <input type="datetime-local">. */
+function aInputDatetimeLocal(fecha: string | null | undefined): string {
+  if (!fecha) return "";
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Programa (o reprograma) el día y la hora de la visita. Tanto el técnico
+ * como Admira pueden usarlo, incluso después de haberla programado ya —
+ * por si hay que cambiarla más adelante. Cada vez que se guarda se avisa
+ * de nuevo por email al comercial con la fecha/hora vigente.
+ */
+function ProgramarVisita({
+  incidenciaId,
+  onProgramada,
+  fechaActual,
+}: {
+  incidenciaId: string;
+  onProgramada: () => void;
+  fechaActual: string | null;
+}) {
+  const [editando, setEditando] = useState(!fechaActual);
+  const [fechaHora, setFechaHora] = useState(() => aInputDatetimeLocal(fechaActual));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -300,13 +324,26 @@ function ProgramarVisita({ incidenciaId, onProgramada }: { incidenciaId: string;
       setError(data.error || "Error al programar la visita.");
       return;
     }
+    setEditando(false);
     onProgramada();
+  }
+
+  if (!editando) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditando(true)}
+        className="mt-2 text-[11px] text-amber-700 hover:underline"
+      >
+        ✏️ Reprogramar visita
+      </button>
+    );
   }
 
   return (
     <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
       <div className="text-xs font-medium text-amber-900 mb-2">
-        📅 Programa el día y la hora de la visita — se avisará automáticamente al comercial del estanco.
+        📅 {fechaActual ? "Cambia" : "Programa"} el día y la hora de la visita — se avisará automáticamente al comercial del estanco.
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <input
@@ -320,8 +357,20 @@ function ProgramarVisita({ incidenciaId, onProgramada }: { incidenciaId: string;
           disabled={guardando}
           className="bg-amber-600 text-white text-xs font-medium rounded-lg px-3 py-2 disabled:opacity-60"
         >
-          {guardando ? "Guardando…" : "Programar visita"}
+          {guardando ? "Guardando…" : fechaActual ? "Guardar nueva fecha" : "Programar visita"}
         </button>
+        {fechaActual && (
+          <button
+            type="button"
+            onClick={() => {
+              setEditando(false);
+              setError(null);
+            }}
+            className="text-xs text-slate-500 hover:underline"
+          >
+            Cancelar
+          </button>
+        )}
       </div>
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
@@ -669,8 +718,8 @@ export default function IncidenciasBoard({
                 </button>
               </div>
 
-              {role === "TECNICO" && inc.estado === "ASIGNADA" && !inc.fechaVisitaProgramada && (
-                <ProgramarVisita incidenciaId={inc.id} onProgramada={load} />
+              {(inc.estado === "ASIGNADA" || inc.estado === "EN_CAMINO") && (
+                <ProgramarVisita incidenciaId={inc.id} onProgramada={load} fechaActual={inc.fechaVisitaProgramada ?? null} />
               )}
 
               {role === "TECNICO" && inc.estado !== "RESUELTA" && (

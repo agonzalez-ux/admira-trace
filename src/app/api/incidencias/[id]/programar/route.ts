@@ -6,17 +6,23 @@ import { notificarComercial } from "@/lib/notificarComercial";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
-  if (!session || session.role !== "TECNICO") {
-    return NextResponse.json({ error: "Solo el técnico asignado puede programar la visita." }, { status: 403 });
+  if (!session || (session.role !== "TECNICO" && session.role !== "ADMIRA")) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
   const incidencia = await prisma.incidencia.findUnique({ where: { id: params.id } });
   if (!incidencia) return NextResponse.json({ error: "Incidencia no encontrada." }, { status: 404 });
-  if (incidencia.tecnicoId !== session.userId) {
+  if (session.role === "TECNICO" && incidencia.tecnicoId !== session.userId) {
     return NextResponse.json({ error: "Esta incidencia no está asignada a tu cuenta." }, { status: 403 });
   }
-  if (incidencia.estado !== "ASIGNADA") {
-    return NextResponse.json({ error: "Solo se puede programar una visita mientras está en estado 'Asignada'." }, { status: 409 });
+  // Se puede (re)programar mientras la visita no se haya resuelto todavía —
+  // tanto la primera vez como para cambiar fecha/hora más adelante si hace
+  // falta (el comercial avisa de un cambio, etc.), incluso ya "en camino".
+  if (incidencia.estado !== "ASIGNADA" && incidencia.estado !== "EN_CAMINO") {
+    return NextResponse.json(
+      { error: "Solo se puede programar/reprogramar una visita mientras está 'Asignada' o 'En camino'." },
+      { status: 409 }
+    );
   }
 
   const body = await req.json().catch(() => null);
@@ -32,7 +38,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     include: { estanco: true, tecnico: true, fotos: true, materialesUsados: { include: { material: true } } },
   });
 
-  // El aviso al comercial no debe bloquear la respuesta al técnico si el email tarda o falla.
+  // El aviso al comercial (con la fecha/hora ya sea la primera vez o tras
+  // reprogramar) no debe bloquear la respuesta si el email tarda o falla.
   notificarComercial(params.id, "PROGRAMADA").catch((err) =>
     console.error("[notificar-comercial] Error avisando de la visita programada:", err)
   );
