@@ -568,18 +568,19 @@ function columnaALetra(indice0: number): string {
 // celda a celda, las columnas que la app conoce con certeza; el resto de la
 // fila queda intacto. Las instalaciones que aún no estén en la hoja se
 // añaden al final, con solo esas columnas rellenas y el resto en blanco.
-// A..AO (0-40) es la hoja real del cliente, completa, sin ningún hueco libre
-// (AF-AO las usa el propio equipo: pantalla/soporte/router/Motivo Pospuesto/
-// datos del comercial/DRIVE). La columna B "CIRC" (Domestic/Travel Retail) se
-// insertó a mano el 2026-08-28 para igualar la estructura del Excel real del
-// cliente — desplazó todo lo anterior una posición a la derecha respecto a
-// como estaba antes. Las columnas de viabilidad son una ampliación nueva de
-// la hoja, a partir de AP (41) — todavía pendiente de ampliar (ver
-// asegurarCabeceraViabilidad: la fila 3 de cabeceras está protegida y ni la
-// cuenta de servicio puede redimensionar/insertar columnas por API; hace
-// falta que alguien con permiso de editor lo haga a mano en Sheets, igual
-// que se hizo con CIRC).
-const CENSO_TOTAL_COLUMNAS = 50; // A..AX
+// A..AX (0-49) es la hoja real del cliente, completa, sin ningún hueco libre
+// (AF-AX las usa el propio equipo: pantalla/soporte/router/Motivo Pospuesto/
+// datos del comercial/DRIVE/etc. — confirmado 2026-09-14, esta zona había
+// crecido desde que se escribió este comentario por primera vez). La columna
+// B "CIRC" (Domestic/Travel Retail) se insertó a mano el 2026-08-28 para
+// igualar la estructura del Excel real del cliente — desplazó todo lo
+// anterior una posición a la derecha respecto a como estaba antes. Las
+// columnas de viabilidad son una ampliación nueva de la hoja, a partir de AY
+// (50) — todavía pendiente de ampliar (ver asegurarCabeceraViabilidad: la
+// fila 3 de cabeceras está protegida y ni la cuenta de servicio puede
+// redimensionar/insertar columnas por API; hace falta que alguien con
+// permiso de editor lo haga a mano en Sheets, igual que se hizo con CIRC).
+const CENSO_TOTAL_COLUMNAS = 59; // A..BG (AY..BG reservadas para viabilidad; A..AX ya está ocupado por datos reales del documento)
 const CENSO_COLUMNAS_APP = {
   // "Domestic" | "Travel Retail" — se escribe como fórmula (ver
   // formulaCirc()), no como valor fijo, calcada de la del Excel real del
@@ -601,15 +602,18 @@ const CENSO_COLUMNAS_APP = {
   informacionSolicitud: 28, // AC
   ultimaActualizacion: 30, // AE
   // --- Viabilidad de instalación (ver src/lib/viabilidad.ts) ---
-  viabilidadEstado: 41, // AP
-  viabilidadMaterialConfirmado: 42, // AQ
-  viabilidadUbicacion: 43, // AR
-  viabilidadMedidas: 44, // AS
-  viabilidadPuntosElectricos: 45, // AT
-  viabilidadTaladrar: 46, // AU
-  viabilidadComentarios: 47, // AV
-  viabilidadRespondidoPor: 48, // AW
-  viabilidadFechaRespuesta: 49, // AX
+  // AY en adelante: la columna AX ya está ocupada por datos reales del
+  // documento (confirmado por el usuario), así que las columnas nuevas se
+  // insertan justo después, no en AP-AX como se había calculado antes.
+  viabilidadEstado: 50, // AY
+  viabilidadMaterialConfirmado: 51, // AZ
+  viabilidadUbicacion: 52, // BA
+  viabilidadMedidas: 53, // BB
+  viabilidadPuntosElectricos: 54, // BC
+  viabilidadTaladrar: 55, // BD
+  viabilidadComentarios: 56, // BE
+  viabilidadRespondidoPor: 57, // BF
+  viabilidadFechaRespuesta: 58, // BG
 } as const;
 
 // Misma fórmula que ya usa el Excel real del cliente para "CIRC": busca el
@@ -763,7 +767,7 @@ async function syncCenso() {
     const filaExistente = filaPorSR.get(sr);
     if (filaExistente) {
       for (const [indice, valor] of Object.entries(valores)) {
-        // Las columnas de viabilidad (AP en adelante) van aparte: solo
+        // Las columnas de viabilidad (AY en adelante) van aparte: solo
         // existen si alguien ya amplió la hoja a mano, y su fallo no debe
         // impedir escribir el resto de columnas de la fila.
         const destino = Number(indice) >= CENSO_COLUMNAS_APP.viabilidadEstado ? dataUpdatesViabilidad : dataUpdates;
@@ -820,24 +824,25 @@ async function syncCenso() {
       valueInputOption: "RAW",
       requestBody: { values: filasNuevas.map((f) => f.slice(0, COL_Q_PROTEGIDA)) },
     });
-    // S:AO son columnas ya existentes en cualquier hoja real (ancho mínimo
-    // 41 = A..AO); AP:AX son las de viabilidad, que solo existen si alguien
-    // ya amplió la hoja a mano (ver asegurarCabeceraViabilidad) — van en un
-    // tercer bloque aparte, con su propio try/catch, para que su fallo
-    // (columnas inexistentes) no impida escribir el resto de la fila.
-    const COL_AO = 40;
+    // S:AX son columnas ya existentes en cualquier hoja real (ancho mínimo
+    // 50 = A..AX, confirmado 2026-09-14); AY:BG son las de viabilidad, que
+    // solo existen si alguien ya amplió la hoja a mano (ver
+    // asegurarCabeceraViabilidad) — van en un tercer bloque aparte, con su
+    // propio try/catch, para que su fallo (columnas inexistentes) no impida
+    // escribir el resto de la fila.
+    const COL_AX = 49;
     await sheets.spreadsheets.values.update({
       spreadsheetId: t.spreadsheetId,
-      range: `${t.tab}!S${primeraFilaLibre}:AO${ultimaFila}`,
+      range: `${t.tab}!S${primeraFilaLibre}:AX${ultimaFila}`,
       valueInputOption: "RAW",
-      requestBody: { values: filasNuevas.map((f) => f.slice(COL_Q_PROTEGIDA + 2, COL_AO + 1)) },
+      requestBody: { values: filasNuevas.map((f) => f.slice(COL_Q_PROTEGIDA + 2, COL_AX + 1)) },
     });
     await sheets.spreadsheets.values
       .update({
         spreadsheetId: t.spreadsheetId,
-        range: `${t.tab}!AP${primeraFilaLibre}:AX${ultimaFila}`,
+        range: `${t.tab}!AY${primeraFilaLibre}:BG${ultimaFila}`,
         valueInputOption: "RAW",
-        requestBody: { values: filasNuevas.map((f) => f.slice(COL_AO + 1)) },
+        requestBody: { values: filasNuevas.map((f) => f.slice(COL_AX + 1)) },
       })
       .catch((err) => console.error("[google-sheets] No se han podido escribir las columnas de viabilidad (aún sin ampliar la hoja):", err.message || err));
   }
