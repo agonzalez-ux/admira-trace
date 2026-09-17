@@ -35,7 +35,7 @@ const VIABILIDAD_COLUMNAS = {
 const VIABILIDAD_CABECERAS: Record<keyof typeof VIABILIDAD_COLUMNAS, string> = {
   materialConfirmado: "VIABILIDAD - Material confirmado",
   materialCorreccion: "VIABILIDAD - Corrección material",
-  tipoUbicacion: "VIABILIDAD - Hueco/Pared",
+  tipoUbicacion: "VIABILIDAD - Ubicación",
   medidas: "VIABILIDAD - Medidas hueco",
   puntosElectricos: "VIABILIDAD - Puntos eléctricos cercanos",
   sePuedeTaladrar: "VIABILIDAD - Se puede taladrar",

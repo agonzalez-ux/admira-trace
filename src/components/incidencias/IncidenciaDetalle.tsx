@@ -6,6 +6,7 @@ import {
   TIPO_INCIDENCIA_LABELS,
   TIPO_MATERIAL_LABELS,
   ESTADO_VIABILIDAD_LABELS,
+  etiquetaUbicacionViabilidad,
 } from "@/lib/constants";
 import WhatsAppButton from "./WhatsAppButton";
 import { obtenerNumeroWhatsAppRotativo, generarMensajeInstalacion } from "@/lib/whatsapp";
@@ -43,6 +44,7 @@ export type IncidenciaDetalleData = {
     materialConfirmado: boolean;
     materialCorreccion: string | null;
     tipoUbicacion: string;
+    ubicacionOtro?: string | null;
     medidasAncho: number | null;
     medidasAlto: number | null;
     medidasFondo: number | null;
@@ -258,8 +260,8 @@ function PanelViabilidad({
           <div className="flex gap-1">
             <dt className="text-slate-400">Ubicación:</dt>
             <dd className="text-slate-700">
-              {r.tipoUbicacion === "HUECO" ? "Hueco" : "Pared"}
-              {r.tipoUbicacion === "HUECO" && r.medidasAncho ? ` — ${r.medidasAncho} x ${r.medidasAlto} x ${r.medidasFondo} cm` : ""}
+              {etiquetaUbicacionViabilidad(r.tipoUbicacion, r.ubicacionOtro)}
+              {r.tipoUbicacion === "HUECO_MUEBLE" && r.medidasAncho ? ` — ${r.medidasAncho} x ${r.medidasAlto} x ${r.medidasFondo} cm` : ""}
             </dd>
           </div>
           <div className="flex gap-1">

@@ -166,3 +166,40 @@ export const ESTADO_VIABILIDAD_LABELS: Record<EstadoViabilidad, string> = {
   VIABLE: "Viable",
   NO_VIABLE: "No viable",
 };
+
+// Dónde va a ir instalada la pantalla, tal como lo describe el comercial en
+// el formulario de viabilidad (ver src/components/FormularioViabilidad.tsx).
+// Solo HUECO_MUEBLE pide medidas (ancho/alto/fondo); OTRO pide una
+// descripción libre en ViabilidadRespuesta.ubicacionOtro.
+export const UBICACIONES_VIABILIDAD = [
+  "HUECO_MUEBLE",
+  "PARED",
+  "ENCIMA_MUEBLE",
+  "MOSTRADOR",
+  "COLUMNA",
+  "OTRO",
+] as const;
+export type UbicacionViabilidad = (typeof UBICACIONES_VIABILIDAD)[number];
+
+export const UBICACION_VIABILIDAD_LABELS: Record<UbicacionViabilidad, string> = {
+  HUECO_MUEBLE: "Hueco de mueble",
+  PARED: "Pared",
+  ENCIMA_MUEBLE: "Encima de mueble",
+  MOSTRADOR: "Mostrador",
+  COLUMNA: "Columna",
+  OTRO: "Otro",
+};
+
+/**
+ * Texto a mostrar/guardar para la ubicación de una respuesta de viabilidad:
+ * la etiqueta normal, o "Otro: <descripción>" si el comercial escribió una
+ * ubicación distinta a las de la lista.
+ */
+export function etiquetaUbicacionViabilidad(
+  tipoUbicacion: string,
+  ubicacionOtro?: string | null
+): string {
+  const label = UBICACION_VIABILIDAD_LABELS[tipoUbicacion as UbicacionViabilidad] || tipoUbicacion;
+  if (tipoUbicacion === "OTRO" && ubicacionOtro) return `${label}: ${ubicacionOtro}`;
+  return label;
+}

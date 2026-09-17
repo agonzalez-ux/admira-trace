@@ -9,6 +9,7 @@ import { syncToSheets } from "@/lib/googleSheets";
 import { actualizarFilaViabilidadEnExcel } from "@/lib/viabilidadExcel";
 import { notificarEquipoAdmira } from "@/lib/notificaciones";
 import { validarFotos } from "@/lib/fotoValidacion";
+import { UBICACIONES_VIABILIDAD, etiquetaUbicacionViabilidad } from "@/lib/constants";
 
 /**
  * Sin sesión: es un formulario público para el comercial de un estanco, que
@@ -52,14 +53,18 @@ export async function POST(req: NextRequest) {
   const materialConfirmado = formData.get("materialConfirmado") === "true";
   const materialCorreccion = String(formData.get("materialCorreccion") || "") || null;
   const tipoUbicacion = String(formData.get("tipoUbicacion") || "");
+  const ubicacionOtro = String(formData.get("ubicacionOtro") || "") || null;
   const puntosElectricosCercanos = formData.get("puntosElectricosCercanos") === "true";
   const puntosElectricosComentario = String(formData.get("puntosElectricosComentario") || "") || null;
   const sePuedeTaladrar = formData.get("sePuedeTaladrar") === "true";
   const comentarios = String(formData.get("comentarios") || "") || null;
   const respondidoPorNombre = String(formData.get("respondidoPorNombre") || "") || null;
 
-  if (!["HUECO", "PARED"].includes(tipoUbicacion)) {
-    return NextResponse.json({ error: "Indica si es un hueco o una pared." }, { status: 400 });
+  if (!(UBICACIONES_VIABILIDAD as readonly string[]).includes(tipoUbicacion)) {
+    return NextResponse.json({ error: "Indica dónde va a ir instalada." }, { status: 400 });
+  }
+  if (tipoUbicacion === "OTRO" && !ubicacionOtro) {
+    return NextResponse.json({ error: "Describe dónde va a ir instalada." }, { status: 400 });
   }
 
   const fotos = formData.getAll("fotos").filter((f): f is File => f instanceof File && f.size > 0);
@@ -67,9 +72,9 @@ export async function POST(req: NextRequest) {
   if (errorFotos) return NextResponse.json({ error: errorFotos }, { status: 400 });
 
   const numOrNull = (v: FormDataEntryValue | null) => (v ? Number(v) || null : null);
-  const medidasAncho = tipoUbicacion === "HUECO" ? numOrNull(formData.get("medidasAncho")) : null;
-  const medidasAlto = tipoUbicacion === "HUECO" ? numOrNull(formData.get("medidasAlto")) : null;
-  const medidasFondo = tipoUbicacion === "HUECO" ? numOrNull(formData.get("medidasFondo")) : null;
+  const medidasAncho = tipoUbicacion === "HUECO_MUEBLE" ? numOrNull(formData.get("medidasAncho")) : null;
+  const medidasAlto = tipoUbicacion === "HUECO_MUEBLE" ? numOrNull(formData.get("medidasAlto")) : null;
+  const medidasFondo = tipoUbicacion === "HUECO_MUEBLE" ? numOrNull(formData.get("medidasFondo")) : null;
 
   const incidenciaId = registro.incidenciaId;
 
@@ -80,6 +85,7 @@ export async function POST(req: NextRequest) {
       materialConfirmado,
       materialCorreccion,
       tipoUbicacion,
+      ubicacionOtro,
       medidasAncho,
       medidasAlto,
       medidasFondo,
@@ -93,6 +99,7 @@ export async function POST(req: NextRequest) {
       materialConfirmado,
       materialCorreccion,
       tipoUbicacion,
+      ubicacionOtro,
       medidasAncho,
       medidasAlto,
       medidasFondo,
@@ -134,9 +141,9 @@ export async function POST(req: NextRequest) {
     actualizarFilaViabilidadEnExcel(incidenciaActualizada.viabilidadExcelFileId, incidenciaActualizada.viabilidadExcelFila, {
       materialConfirmado,
       materialCorreccion,
-      tipoUbicacion,
+      tipoUbicacion: etiquetaUbicacionViabilidad(tipoUbicacion, ubicacionOtro),
       medidas:
-        tipoUbicacion === "HUECO" && (medidasAncho || medidasAlto || medidasFondo)
+        tipoUbicacion === "HUECO_MUEBLE" && (medidasAncho || medidasAlto || medidasFondo)
           ? `${medidasAncho ?? "?"} x ${medidasAlto ?? "?"} x ${medidasFondo ?? "?"} cm`
           : null,
       puntosElectricosCercanos,

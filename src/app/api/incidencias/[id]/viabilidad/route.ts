@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { syncToSheets } from "@/lib/googleSheets";
 import { actualizarFilaViabilidadEnExcel } from "@/lib/viabilidadExcel";
 import { solicitarViabilidadComercial } from "@/lib/viabilidad";
+import { etiquetaUbicacionViabilidad } from "@/lib/constants";
 
 /**
  * Revisión manual de la viabilidad de una instalación, tras la respuesta del
@@ -43,9 +44,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         actualizarFilaViabilidadEnExcel(actualizada.viabilidadExcelFileId, actualizada.viabilidadExcelFila, {
           materialConfirmado: respuesta.materialConfirmado,
           materialCorreccion: respuesta.materialCorreccion,
-          tipoUbicacion: respuesta.tipoUbicacion,
+          tipoUbicacion: etiquetaUbicacionViabilidad(respuesta.tipoUbicacion, respuesta.ubicacionOtro),
           medidas:
-            respuesta.tipoUbicacion === "HUECO"
+            respuesta.tipoUbicacion === "HUECO_MUEBLE"
               ? `${respuesta.medidasAncho ?? "?"} x ${respuesta.medidasAlto ?? "?"} x ${respuesta.medidasFondo ?? "?"} cm`
               : null,
           puntosElectricosCercanos: respuesta.puntosElectricosCercanos,

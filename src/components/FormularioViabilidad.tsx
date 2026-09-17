@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { UBICACIONES_VIABILIDAD, UBICACION_VIABILIDAD_LABELS, UbicacionViabilidad } from "@/lib/constants";
 
 type EstadoCarga = "comprobando" | "valido" | "invalido" | "enviando" | "hecho";
 
@@ -13,7 +14,8 @@ export default function FormularioViabilidad({ token }: { token: string }) {
 
   const [materialConfirmado, setMaterialConfirmado] = useState<"si" | "no" | "">("");
   const [materialCorreccion, setMaterialCorreccion] = useState("");
-  const [tipoUbicacion, setTipoUbicacion] = useState<"HUECO" | "PARED" | "">("");
+  const [tipoUbicacion, setTipoUbicacion] = useState<UbicacionViabilidad | "">("");
+  const [ubicacionOtro, setUbicacionOtro] = useState("");
   const [medidasAncho, setMedidasAncho] = useState("");
   const [medidasAlto, setMedidasAlto] = useState("");
   const [medidasFondo, setMedidasFondo] = useState("");
@@ -61,8 +63,12 @@ export default function FormularioViabilidad({ token }: { token: string }) {
       setError("Indica cuál es el material/tamaño correcto.");
       return;
     }
-    if (tipoUbicacion === "HUECO" && (!medidasAncho || !medidasAlto || !medidasFondo)) {
+    if (tipoUbicacion === "HUECO_MUEBLE" && (!medidasAncho || !medidasAlto || !medidasFondo)) {
       setError("Indica las 3 medidas del hueco.");
+      return;
+    }
+    if (tipoUbicacion === "OTRO" && !ubicacionOtro.trim()) {
+      setError("Describe dónde va a ir instalada.");
       return;
     }
 
@@ -72,10 +78,13 @@ export default function FormularioViabilidad({ token }: { token: string }) {
     formData.append("materialConfirmado", materialConfirmado === "si" ? "true" : "false");
     formData.append("materialCorreccion", materialCorreccion);
     formData.append("tipoUbicacion", tipoUbicacion);
-    if (tipoUbicacion === "HUECO") {
+    if (tipoUbicacion === "HUECO_MUEBLE") {
       formData.append("medidasAncho", medidasAncho);
       formData.append("medidasAlto", medidasAlto);
       formData.append("medidasFondo", medidasFondo);
+    }
+    if (tipoUbicacion === "OTRO") {
+      formData.append("ubicacionOtro", ubicacionOtro);
     }
     formData.append("puntosElectricosCercanos", puntosElectricos === "si" ? "true" : "false");
     formData.append("puntosElectricosComentario", puntosElectricosComentario);
@@ -151,24 +160,20 @@ export default function FormularioViabilidad({ token }: { token: string }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">¿Es un hueco o una pared?</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTipoUbicacion("HUECO")}
-                  className={`flex-1 rounded-lg py-2 text-sm font-medium ${tipoUbicacion === "HUECO" ? "bg-admira-600 text-white" : "bg-slate-100 text-slate-600"}`}
-                >
-                  Hueco
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTipoUbicacion("PARED")}
-                  className={`flex-1 rounded-lg py-2 text-sm font-medium ${tipoUbicacion === "PARED" ? "bg-admira-600 text-white" : "bg-slate-100 text-slate-600"}`}
-                >
-                  Pared
-                </button>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">¿Dónde va a ir instalada?</label>
+              <div className="grid grid-cols-2 gap-2">
+                {UBICACIONES_VIABILIDAD.map((opcion) => (
+                  <button
+                    key={opcion}
+                    type="button"
+                    onClick={() => setTipoUbicacion(opcion)}
+                    className={`rounded-lg py-2 text-sm font-medium ${tipoUbicacion === opcion ? "bg-admira-600 text-white" : "bg-slate-100 text-slate-600"}`}
+                  >
+                    {UBICACION_VIABILIDAD_LABELS[opcion]}
+                  </button>
+                ))}
               </div>
-              {tipoUbicacion === "HUECO" && (
+              {tipoUbicacion === "HUECO_MUEBLE" && (
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <input
                     type="number"
@@ -192,6 +197,14 @@ export default function FormularioViabilidad({ token }: { token: string }) {
                     className="rounded-lg border border-slate-300 px-2 py-2 text-sm"
                   />
                 </div>
+              )}
+              {tipoUbicacion === "OTRO" && (
+                <input
+                  value={ubicacionOtro}
+                  onChange={(e) => setUbicacionOtro(e.target.value)}
+                  placeholder="¿Dónde exactamente?"
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
               )}
             </div>
 

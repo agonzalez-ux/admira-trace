@@ -8,6 +8,7 @@ import {
   TIPO_INCIDENCIA_LABELS,
   PROYECTO_LABELS,
   ESTADO_VIABILIDAD_LABELS,
+  etiquetaUbicacionViabilidad,
 } from "./constants";
 import { DOCUMENTOS, DocumentKey, getDocumentSpreadsheetId, getDocumentUrl } from "./documentSheets";
 import { etiquetaOrigenIncidencia } from "./materialLabel";
@@ -625,7 +626,7 @@ const CENSO_COLUMNAS_APP = {
 const CENSO_CABECERA_VIABILIDAD: Partial<Record<keyof typeof CENSO_COLUMNAS_APP, string>> = {
   viabilidadEstado: "Viabilidad — Estado",
   viabilidadMaterialConfirmado: "Viabilidad — Material confirmado",
-  viabilidadUbicacion: "Viabilidad — Hueco/Pared",
+  viabilidadUbicacion: "Viabilidad — Ubicación",
   viabilidadMedidas: "Viabilidad — Medidas",
   viabilidadPuntosElectricos: "Viabilidad — Puntos eléctricos cerca",
   viabilidadTaladrar: "Viabilidad — Se puede taladrar",
@@ -746,9 +747,12 @@ async function syncCenso() {
             [CENSO_COLUMNAS_APP.viabilidadMaterialConfirmado]: i.viabilidadRespuesta.materialConfirmado
               ? "Sí"
               : `No — ${i.viabilidadRespuesta.materialCorreccion || ""}`,
-            [CENSO_COLUMNAS_APP.viabilidadUbicacion]: i.viabilidadRespuesta.tipoUbicacion === "HUECO" ? "Hueco" : "Pared",
+            [CENSO_COLUMNAS_APP.viabilidadUbicacion]: etiquetaUbicacionViabilidad(
+              i.viabilidadRespuesta.tipoUbicacion,
+              i.viabilidadRespuesta.ubicacionOtro
+            ),
             [CENSO_COLUMNAS_APP.viabilidadMedidas]:
-              i.viabilidadRespuesta.tipoUbicacion === "HUECO"
+              i.viabilidadRespuesta.tipoUbicacion === "HUECO_MUEBLE"
                 ? `${i.viabilidadRespuesta.medidasAncho ?? "?"} x ${i.viabilidadRespuesta.medidasAlto ?? "?"} x ${i.viabilidadRespuesta.medidasFondo ?? "?"} cm`
                 : "",
             [CENSO_COLUMNAS_APP.viabilidadPuntosElectricos]: i.viabilidadRespuesta.puntosElectricosCercanos ? "Sí" : "No",

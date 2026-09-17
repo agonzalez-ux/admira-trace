@@ -341,8 +341,10 @@ model ViabilidadRespuesta {
   incidencia                  Incidencia @relation(fields: [incidenciaId], references: [id])
   materialConfirmado          Boolean
   materialCorreccion          String?
-  // HUECO | PARED
+  // Ver UBICACIONES_VIABILIDAD en src/lib/constants.ts
   tipoUbicacion               String
+  // Solo si tipoUbicacion === "OTRO": descripción libre de dónde va la pantalla
+  ubicacionOtro               String?
   medidasAncho                Float?
   medidasAlto                 Float?
   medidasFondo                Float?
