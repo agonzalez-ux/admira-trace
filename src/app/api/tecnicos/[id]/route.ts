@@ -62,6 +62,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       creadoPor: { select: { name: true } },
       estanco: { select: { nombre: true, comercial: true, telefonoComercial: true, correoComercial: true } },
     },
+    // La ficha del técnico solo necesita mostrar su historial reciente, no
+    // años de intervenciones — sin este límite, un técnico veterano hace
+    // cada vez más pesada de cargar su propia ficha.
+    take: 100,
   });
 
   // Envíos pendientes de recibir por este técnico (el "recibo de material" de su ficha).

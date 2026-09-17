@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { calcularProximaEjecucion } from "@/lib/ordenesRecurrentes";
+import { TRANSPORTISTAS } from "@/lib/constants";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
   const tecnico = await prisma.user.findUnique({ where: { id: tecnicoId } });
   if (!tecnico || tecnico.role !== "TECNICO") {
     return NextResponse.json({ error: "Técnico no válido." }, { status: 400 });
+  }
+
+  if (transportista && !TRANSPORTISTAS.includes(transportista)) {
+    return NextResponse.json({ error: "Transportista no válido." }, { status: 400 });
   }
 
   const limpio = materialConfig

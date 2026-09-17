@@ -7,6 +7,17 @@ import { parsePedido, origenRolFor, destinoRolFor, totalPorTipo } from "@/lib/en
 import { cerrarOrigen } from "@/lib/envios";
 import { etiquetaTipo } from "@/lib/materialLabel";
 
+// Permite devolver un error de negocio concreto (con su propio status) desde
+// dentro de un prisma.$transaction() sin que Prisma lo trate como un fallo
+// de la propia transacción — se atrapa fuera y se traduce a NextResponse.
+class ScanError extends Error {
+  status: number;
+  constructor(message: string, status = 409) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
   if (!session || (session.role !== "FDM" && session.role !== "ADMIRA" && session.role !== "TECNICO")) {
@@ -57,6 +68,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const pedido = parsePedido(envio.pedido);
   const now = new Date();
 
+  // El recuento de escaneados (¿ya llegamos al cupo del pedido? ¿ya está
+  // todo confirmado en destino?) se vuelve a leer DENTRO de la transacción,
+  // no del `envio.items` cacheado de arriba — si dos personas escanean casi
+  // a la vez en el mismo envío, la segunda transacción espera a que la
+  // primera confirme y ve ya reflejado su cambio, en vez de decidir sobre
+  // datos obsoletos (evita duplicar el cierre o superar el cupo pedido).
+  let cerrarOrigenAhora = false;
+  let notificarRecibidoTotal: number | null = null;
+
   if (side === "origen") {
     const estadoEsperado = envio.tipo === "RECOGIDA" ? "EN_TECNICO" : envio.almacen === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM";
     if (material.estado !== estadoEsperado) {
@@ -68,23 +88,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (envio.tipo === "RECOGIDA" && material.tecnicoId !== envio.tecnicoId) {
       return NextResponse.json({ error: "Ese material no está en poder de este técnico." }, { status: 409 });
     }
-    if (envio.items.some((i) => i.materialId === material.id)) {
-      return NextResponse.json({ error: "Ese material ya se ha escaneado en este movimiento." }, { status: 409 });
-    }
 
-    // Puede haber varias líneas del mismo tipo en el pedido (varias líneas
-    // "Otro" con descripciones distintas) — cuentan juntas contra el total.
     const totalDeTipo = totalPorTipo(pedido).get(material.tipo);
     if (!totalDeTipo) {
       const nombreTipo = etiquetaTipo(material);
       return NextResponse.json({ error: `Este pedido no incluye ${nombreTipo}.` }, { status: 409 });
-    }
-    const yaEscaneadosDeTipo = envio.items.filter((i) => i.material.tipo === material.tipo).length;
-    if (yaEscaneadosDeTipo >= totalDeTipo) {
-      return NextResponse.json(
-        { error: `Ya se ha escaneado la cantidad pedida de ese tipo (${totalDeTipo}).` },
-        { status: 409 }
-      );
     }
 
     const estadoTransito =
@@ -94,50 +102,74 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           ? "EN_TRANSITO_TRANSFERENCIA"
           : "EN_TRANSITO_ENVIO";
 
-    await prisma.envioItem.create({
-      data: { envioId: envio.id, materialId: material.id, escaneadoOrigen: true, fechaEscaneoOrigen: now },
-    });
-    await prisma.material.update({ where: { id: material.id }, data: { estado: estadoTransito } });
+    try {
+      await prisma.$transaction(async (tx) => {
+        const itemsActuales = await tx.envioItem.findMany({ where: { envioId: envio.id }, include: { material: true } });
+        if (itemsActuales.some((i) => i.materialId === material.id)) {
+          throw new ScanError("Ese material ya se ha escaneado en este movimiento.");
+        }
+        // Puede haber varias líneas del mismo tipo en el pedido (varias
+        // líneas "Otro" con descripciones distintas) — cuentan juntas.
+        const yaEscaneadosDeTipo = itemsActuales.filter((i) => i.material.tipo === material.tipo).length;
+        if (yaEscaneadosDeTipo >= totalDeTipo) {
+          throw new ScanError(`Ya se ha escaneado la cantidad pedida de ese tipo (${totalDeTipo}).`);
+        }
 
-    const totalPedido = pedido.reduce((s, p) => s + p.cantidad, 0);
-    const totalEscaneado = envio.items.length + 1;
-    if (totalEscaneado >= totalPedido) {
-      await cerrarOrigen(envio.id, now);
+        await tx.envioItem.create({
+          data: { envioId: envio.id, materialId: material.id, escaneadoOrigen: true, fechaEscaneoOrigen: now },
+        });
+        await tx.material.update({ where: { id: material.id }, data: { estado: estadoTransito } });
+
+        const totalPedido = pedido.reduce((s, p) => s + p.cantidad, 0);
+        if (itemsActuales.length + 1 >= totalPedido) cerrarOrigenAhora = true;
+      });
+    } catch (err) {
+      if (err instanceof ScanError) return NextResponse.json({ error: err.message }, { status: 409 });
+      throw err;
     }
+
+    if (cerrarOrigenAhora) await cerrarOrigen(envio.id, now);
   } else {
-    const item = envio.items.find((i) => i.materialId === material.id && i.escaneadoOrigen);
-    if (!item) {
-      return NextResponse.json(
-        { error: "Ese material no fue registrado como enviado en este movimiento." },
-        { status: 404 }
-      );
-    }
-    if (item.escaneadoDestino) {
-      return NextResponse.json({ error: "Ese material ya se ha confirmado en destino." }, { status: 409 });
-    }
-
     const estadoFinal = envio.tipo === "ENVIO" ? "EN_TECNICO" : destinoRol === "ADMIRA" ? "EN_ADMIRA" : "EN_FDM";
 
-    await prisma.envioItem.update({ where: { id: item.id }, data: { escaneadoDestino: true, fechaEscaneoDestino: now } });
-    await prisma.material.update({
-      where: { id: material.id },
-      data: { estado: estadoFinal, tecnicoId: envio.tipo === "ENVIO" ? envio.tecnicoId : null },
-    });
+    try {
+      await prisma.$transaction(async (tx) => {
+        const itemsActuales = await tx.envioItem.findMany({ where: { envioId: envio.id } });
+        const item = itemsActuales.find((i) => i.materialId === material.id && i.escaneadoOrigen);
+        if (!item) {
+          throw new ScanError("Ese material no fue registrado como enviado en este movimiento.", 404);
+        }
+        if (item.escaneadoDestino) {
+          throw new ScanError("Ese material ya se ha confirmado en destino.");
+        }
 
-    const totalEnviado = envio.items.length; // fijo desde que se cerró el origen
-    const totalConfirmado = envio.items.filter((i) => i.escaneadoDestino).length + 1;
-    if (totalConfirmado >= totalEnviado) {
-      await prisma.envio.update({ where: { id: envio.id }, data: { estado: "RECIBIDO", fechaRecibido: now } });
-      if (envio.creadoPorId) {
-        await crearNotificacion({
-          userId: envio.creadoPorId,
-          tipo: "ENVIO_RECIBIDO",
-          titulo: envio.tipo === "ENVIO" ? "Envío confirmado por el técnico" : "Movimiento confirmado en destino",
-          mensaje: `${totalEnviado} artículo(s) recibidos en ${envio.destino}.`,
-          entidadTipo: "envio",
-          entidadId: envio.id,
+        await tx.envioItem.update({ where: { id: item.id }, data: { escaneadoDestino: true, fechaEscaneoDestino: now } });
+        await tx.material.update({
+          where: { id: material.id },
+          data: { estado: estadoFinal, tecnicoId: envio.tipo === "ENVIO" ? envio.tecnicoId : null },
         });
-      }
+
+        const totalEnviado = itemsActuales.length; // fijo desde que se cerró el origen
+        const totalConfirmado = itemsActuales.filter((i) => i.escaneadoDestino).length + 1;
+        if (totalConfirmado >= totalEnviado) {
+          await tx.envio.update({ where: { id: envio.id }, data: { estado: "RECIBIDO", fechaRecibido: now } });
+          notificarRecibidoTotal = totalEnviado;
+        }
+      });
+    } catch (err) {
+      if (err instanceof ScanError) return NextResponse.json({ error: err.message }, { status: err.status });
+      throw err;
+    }
+
+    if (notificarRecibidoTotal !== null && envio.creadoPorId) {
+      await crearNotificacion({
+        userId: envio.creadoPorId,
+        tipo: "ENVIO_RECIBIDO",
+        titulo: envio.tipo === "ENVIO" ? "Envío confirmado por el técnico" : "Movimiento confirmado en destino",
+        mensaje: `${notificarRecibidoTotal} artículo(s) recibidos en ${envio.destino}.`,
+        entidadTipo: "envio",
+        entidadId: envio.id,
+      });
     }
   }
 
@@ -146,7 +178,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     include: { items: { include: { material: true } }, tecnico: true },
   });
 
-  await syncToSheets(["envios", "materiales", "tecnicos"]);
+  syncToSheets(["envios", "materiales", "tecnicos"]).catch((err) =>
+    console.error("[envios/scan] Error sincronizando Sheets:", err)
+  );
 
   return NextResponse.json({ envio: final, material });
 }

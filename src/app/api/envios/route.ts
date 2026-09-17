@@ -26,6 +26,10 @@ export async function GET(req: NextRequest) {
       items: { include: { material: true } },
     },
     orderBy: { fechaCreacion: "desc" },
+    // Salvaguarda de rendimiento: sin esto, FDM/Admira cargan TODO el
+    // histórico de envíos en cada visita a la pestaña. 3.000 es hoy muchas
+    // veces el volumen real; si se alcanza, hará falta paginar de verdad.
+    take: 3000,
   });
 
   return NextResponse.json({ envios });
@@ -179,7 +183,7 @@ export async function POST(req: NextRequest) {
     include: { items: { include: { material: true } }, tecnico: true },
   });
 
-  await syncToSheets(["envios"]);
+  syncToSheets(["envios"]).catch((err) => console.error("[envios] Error sincronizando Sheets:", err));
 
   if (conEmailAutomatico) {
     if (origenEsQuienCrea) {

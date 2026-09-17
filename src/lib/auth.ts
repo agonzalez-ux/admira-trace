@@ -2,8 +2,8 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { Rol } from "./constants";
 import { iniciarScheduler } from "./scheduler";
+import { JWT_SECRET as SECRET } from "./jwtSecret";
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
 const COOKIE_NAME = "admira_trace_session";
 
 export type SessionPayload = {

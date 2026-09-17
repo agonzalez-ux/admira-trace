@@ -112,7 +112,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     include: { items: { include: { material: true } }, tecnico: true },
   });
 
-  await syncToSheets(["envios", "materiales"]);
+  syncToSheets(["envios", "materiales"]).catch((err) =>
+    console.error("[envios/finalizar] Error sincronizando Sheets:", err)
+  );
 
   return NextResponse.json({ envio: final });
 }

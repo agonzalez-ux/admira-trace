@@ -32,6 +32,10 @@ export async function GET(req: NextRequest) {
       estancoInstalado: { select: { id: true, nombre: true, municipio: true } },
     },
     orderBy: { createdAt: "desc" },
+    // Salvaguarda de rendimiento: sin filtro de proyecto/estado esto es todo
+    // el inventario histórico. 5.000 es hoy muchas veces el volumen real;
+    // si se alcanza, hará falta paginar de verdad en vez de solo subir esto.
+    take: 5000,
   });
 
   // `estancoInstaladoId` se rellena directamente al instalar (ver POST
@@ -116,7 +120,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await syncToSheets("materiales");
+  syncToSheets("materiales").catch((err) => console.error("[materiales] Error sincronizando Sheets:", err));
 
   return NextResponse.json({ material });
 }

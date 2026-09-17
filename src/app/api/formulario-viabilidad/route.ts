@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     }).catch((err) => console.error("[formulario-viabilidad] Error actualizando el Excel de origen:", err));
   }
 
-  await syncToSheets(["incidencias", "censo"]).catch((err) =>
+  syncToSheets(["incidencias", "censo"]).catch((err) =>
     console.error("[formulario-viabilidad] Error sincronizando Sheets:", err)
   );
 

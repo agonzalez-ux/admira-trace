@@ -3,11 +3,16 @@
  * Alterna entre 3 números para evitar saturación.
  */
 
-const NUMEROS_WHATSAPP = [
-  '+34 640 80 69 28',
-  '+34 689 35 89 00',
-  '+34 685 93 59 68',
-];
+// Configurables por variable de entorno (WHATSAPP_NUMEROS, separados por
+// coma) para poder rotarlos sin desplegar código — con estos como fallback
+// si la variable no está definida.
+const NUMEROS_WHATSAPP = (
+  process.env.WHATSAPP_NUMEROS?.split(",").map((n) => n.trim()).filter(Boolean) || [
+    "+34 640 80 69 28",
+    "+34 689 35 89 00",
+    "+34 685 93 59 68",
+  ]
+);
 
 /**
  * Obtiene el siguiente número de WhatsApp usando un índice basado en hash.

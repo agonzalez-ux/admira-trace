@@ -36,7 +36,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // También hay que sincronizar "censo": si es una instalación nueva, vincular
   // el estanco cambia su dirección/CP/provincia/CIRC ahí, no solo en "incidencias".
-  await syncToSheets(["incidencias", "censo"]);
+  syncToSheets(["incidencias", "censo"]).catch((err) =>
+    console.error("[incidencias/estanco] Error sincronizando Sheets:", err)
+  );
 
   return NextResponse.json({ incidencia: updated });
 }

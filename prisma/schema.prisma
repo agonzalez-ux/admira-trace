@@ -98,6 +98,8 @@ model User {
 
   notificaciones     Notificacion[]
   pushSuscripciones  PushSubscription[]
+
+  @@index([role, active])
 }
 
 // Token de un solo uso para restablecer la contraseña por email.
@@ -153,8 +155,9 @@ model Material {
   tipoPersonalizado String?
   nombre       String
   descripcion  String?
-  // Solo tiene sentido para routers (tipo "PC" u otros no lo usan). Es un dato
-  // fijo de la propia unidad, no cambia con envíos/instalaciones.
+  // Solo se pide en el alta cuando tipo === "ROUTER" (ver
+  // src/app/api/materiales/route.ts) — es un dato fijo de la propia unidad
+  // (identifica su tarjeta SIM/módem), no cambia con envíos/instalaciones.
   imei         String?
   // PENINSULA | BLU | ANDORRA | CANARIAS | PORTUGAL (ver src/lib/constants.ts).
   // Nullable solo por el material histórico importado sin etiqueta clara;
@@ -176,6 +179,9 @@ model Material {
   envioItems     EnvioItem[]
   eventos        MaterialEvento[]
   incidenciaUsos IncidenciaMaterial[]
+
+  @@index([tecnicoId])
+  @@index([estado])
 }
 
 // tipo: ALTA | ENVIO_PREPARADO_FDM | RECEPCION_TECNICO | INSTALACION | RECOGIDA_TECNICO | DEVOLUCION_FDM | BAJA
@@ -190,6 +196,8 @@ model MaterialEvento {
   envioId      String?
   incidenciaId String?
   notas        String?
+
+  @@index([materialId])
 }
 
 // tipo: ENVIO (almacén → técnico) | RECOGIDA (técnico → almacén) |
@@ -255,6 +263,8 @@ model Envio {
   emailTransportistaError     String?
 
   items EnvioItem[]
+
+  @@index([tecnicoId])
 }
 
 model EnvioItem {
@@ -267,6 +277,10 @@ model EnvioItem {
   fechaEscaneoOrigen   DateTime?
   escaneadoDestino     Boolean   @default(false)
   fechaEscaneoDestino  DateTime?
+
+  // Impide a nivel de BD escanear dos veces el mismo material en el mismo
+  // movimiento (defensa adicional a la comprobación de la propia API).
+  @@unique([envioId, materialId])
 }
 
 // tipo: INSTALACION_NUEVA | REPARACION | MANTENIMIENTO
@@ -317,6 +331,13 @@ model Incidencia {
   // instalaciones creadas a partir de ahora arrancan en PENDIENTE_RESPUESTA.
   // Mientras no sea VIABLE, la instalación no aparece en la bandeja de
   // asignación a técnico (ver IncidenciasBoard.tsx).
+  //
+  // OJO: este flujo de confirmación con el comercial solo se dispara al
+  // importar el Excel semanal (ver importar-instalaciones/route.ts). Una
+  // instalación creada a mano vía POST /api/incidencias nace directamente
+  // "VIABLE" y se asigna al técnico de inmediato — es una decisión deliberada
+  // (ese camino ya asume que Admira confirmó los datos por otra vía antes de
+  // crearla a mano), no un caso que se haya olvidado de cubrir.
   viabilidadEstado       String    @default("VIABLE")
   // Excel semanal (guardado en Drive) y fila donde vive esta instalación, para
   // poder volver a abrir exactamente ese fichero cuando llegue la respuesta
@@ -330,6 +351,11 @@ model Incidencia {
   viabilidadRespuesta ViabilidadRespuesta?
   viabilidadFotos     ViabilidadFoto[]
   viabilidadTokens    ViabilidadToken[]
+
+  @@index([tecnicoId, estado])
+  @@index([proyecto])
+  @@index([estancoId])
+  @@index([ticketExternoId])
 }
 
 // Respuesta del comercial al formulario de viabilidad de una instalación

@@ -76,7 +76,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     });
   }
 
-  await syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]);
+  syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]).catch((err) =>
+    console.error("[incidencias/[id]] Error sincronizando Sheets:", err)
+  );
 
   return NextResponse.json({ incidencia: updated });
 }

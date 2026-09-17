@@ -44,7 +44,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     console.error("[notificar-comercial] Error avisando de la visita programada:", err)
   );
 
-  await syncToSheets(["incidencias", "intervenciones", "censo"]);
+  syncToSheets(["incidencias", "intervenciones", "censo"]).catch((err) =>
+    console.error("[incidencias/programar] Error sincronizando Sheets:", err)
+  );
 
   return NextResponse.json({ incidencia: updated });
 }

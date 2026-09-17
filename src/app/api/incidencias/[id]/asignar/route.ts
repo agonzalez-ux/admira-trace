@@ -36,7 +36,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     include: { tecnico: true },
   });
 
-  await syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]);
+  syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]).catch((err) =>
+    console.error("[incidencias/asignar] Error sincronizando Sheets:", err)
+  );
 
   await crearNotificacion({
     userId: tecnicoId,

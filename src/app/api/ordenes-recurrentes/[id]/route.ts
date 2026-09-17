@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { calcularProximaEjecucion } from "@/lib/ordenesRecurrentes";
 import { validarPedido } from "@/lib/envioLabel";
+import { TRANSPORTISTAS } from "@/lib/constants";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
@@ -25,7 +26,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // (o desde ahora si nunca se ha ejecutado), para que el cambio surta efecto ya.
     data.proximaEjecucion = calcularProximaEjecucion(orden.ultimaEjecucion || new Date(), dias);
   }
-  if (transportista !== undefined) data.transportista = transportista;
+  if (transportista !== undefined) {
+    if (!TRANSPORTISTAS.includes(transportista)) {
+      return NextResponse.json({ error: "Transportista no válido." }, { status: 400 });
+    }
+    data.transportista = transportista;
+  }
   if (notas !== undefined) data.notas = notas || null;
   if (activa !== undefined) data.activa = Boolean(activa);
   if (materialConfig !== undefined) {

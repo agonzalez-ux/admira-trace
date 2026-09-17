@@ -912,11 +912,28 @@ const SYNCERS = {
 
 export type SheetsSection = keyof typeof SYNCERS;
 
+type EstadoSyncSeccion = { ok: boolean; en: string; error?: string };
+
+// La mayoría de rutas de escritura disparan esto sin esperar la respuesta
+// (ver syncToSheets más abajo), así que si Sheets empieza a fallar de forma
+// persistente (cuota agotada, token caducado) nadie lo vería salvo mirando
+// los logs del contenedor. Este registro en memoria permite exponer el
+// último resultado por sección en GET /api/sheets/status.
+const ultimoSync: Partial<Record<SheetsSection, EstadoSyncSeccion>> = {};
+
+export function getUltimoSyncStatus(): Partial<Record<SheetsSection, EstadoSyncSeccion>> {
+  return ultimoSync;
+}
+
 /**
  * Sincroniza una o varias secciones. Cada una comprueba por sí misma si su
  * Google Sheet de destino está configurado; si no lo está, no hace nada.
  * `forceEstancos` salta el límite de frecuencia del directorio de estancos
  * (lo usa el botón manual "Sincronizar ahora").
+ *
+ * No lanza nunca (cada sección atrapa su propio error), así que las rutas
+ * que solo quieren "disparar y olvidar" pueden llamarla sin `await` y sin
+ * `.catch()` de seguridad.
  */
 export async function syncToSheets(
   sections: SheetsSection | SheetsSection[],
@@ -931,8 +948,14 @@ export async function syncToSheets(
         if (s === "estancos") await syncEstancos(opts?.forceEstancos);
         else if (s === "materiales") await syncMateriales(opts?.forceMateriales);
         else await SYNCERS[s]();
+        ultimoSync[s] = { ok: true, en: new Date().toISOString() };
       } catch (err) {
         console.error(`[google-sheets] Error sincronizando "${s}":`, err);
+        ultimoSync[s] = {
+          ok: false,
+          en: new Date().toISOString(),
+          error: err instanceof Error ? err.message : String(err),
+        };
       }
     })
   );

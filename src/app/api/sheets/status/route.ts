@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { SHEETS_CONFIGURED, SHEETS_URL, syncToSheets, getSheetTabLinks, getDocumentUrls } from "@/lib/googleSheets";
+import {
+  SHEETS_CONFIGURED,
+  SHEETS_URL,
+  syncToSheets,
+  getSheetTabLinks,
+  getDocumentUrls,
+  getUltimoSyncStatus,
+} from "@/lib/googleSheets";
 import { DOCUMENTOS } from "@/lib/documentSheets";
 
 export async function GET() {
@@ -29,6 +36,7 @@ export async function GET() {
     links,
     documentUrls,
     documentTitles,
+    ultimoSync: getUltimoSyncStatus(),
   });
 }
 

@@ -10,12 +10,15 @@ const TABLES: { key: string; label: string }[] = [
   { key: "tecnicos", label: "Técnicos" },
 ];
 
+type EstadoSyncSeccion = { ok: boolean; en: string; error?: string };
+
 type SheetsStatus = {
   configured: boolean;
   url: string | null;
   links: Record<string, string> | null;
   documentUrls: Record<string, string | null>;
   documentTitles: Record<string, string>;
+  ultimoSync?: Partial<Record<string, EstadoSyncSeccion>>;
 };
 
 // Los 5 documentos reales que ya usa el equipo, mapeados a la clave interna de cada pestaña.
@@ -42,7 +45,9 @@ export default function ExportButtons({
     fetch("/api/sheets/status")
       .then((r) => r.json())
       .then(setSheets)
-      .catch(() => setSheets({ configured: false, url: null, links: null, documentUrls: {}, documentTitles: {} }));
+      .catch(() =>
+        setSheets({ configured: false, url: null, links: null, documentUrls: {}, documentTitles: {} })
+      );
   }
 
   useEffect(() => {
@@ -66,8 +71,25 @@ export default function ExportButtons({
     load();
   }
 
+  const fallosSync = Object.entries(sheets?.ultimoSync || {}).filter(([, e]) => e && !e.ok) as [
+    string,
+    EstadoSyncSeccion,
+  ][];
+
   return (
     <div className="space-y-4">
+      {fallosSync.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+          <p className="font-semibold mb-1">⚠️ Última sincronización con Google Sheets falló en algunas secciones:</p>
+          <ul className="list-disc list-inside space-y-0.5">
+            {fallosSync.map(([key, e]) => (
+              <li key={key}>
+                {key}: {e.error || "error desconocido"} ({new Date(e.en).toLocaleString("es-ES")})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
         <h3 className="font-semibold text-slate-800 mb-1">Documentos en vivo</h3>
         {sheets?.configured ? (

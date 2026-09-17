@@ -60,7 +60,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     }
 
-    await syncToSheets(["incidencias", "censo"]);
+    syncToSheets(["incidencias", "censo"]).catch((err) =>
+      console.error("[incidencias/viabilidad] Error sincronizando Sheets:", err)
+    );
 
     return NextResponse.json({ incidencia: actualizada });
   }

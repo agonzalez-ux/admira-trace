@@ -26,10 +26,13 @@ export async function GET(req: NextRequest, { params }: { params: { ruta: string
   if (!session) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
 
   const relativa = (params.ruta || []).join("/");
-  const destino = path.resolve(UPLOADS_DIR, relativa);
+  const raiz = path.resolve(UPLOADS_DIR);
+  const destino = path.resolve(raiz, relativa);
 
-  // Evita que una ruta con ".." se salga de la carpeta de subidas.
-  if (!destino.startsWith(path.resolve(UPLOADS_DIR))) {
+  // Evita que una ruta con ".." se salga de la carpeta de subidas. Comparar
+  // con "raiz + separador" (no solo startsWith(raiz)) evita que una carpeta
+  // hermana con el mismo prefijo (p.ej. "uploads-backup") cuele el check.
+  if (destino !== raiz && !destino.startsWith(raiz + path.sep)) {
     return NextResponse.json({ error: "Ruta no válida." }, { status: 400 });
   }
 

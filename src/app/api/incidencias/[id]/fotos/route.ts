@@ -48,7 +48,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     data: { incidenciaId: params.id, url },
   });
 
-  await syncToSheets("incidencias");
+  syncToSheets("incidencias").catch((err) =>
+    console.error("[incidencias/fotos] Error sincronizando Sheets:", err)
+  );
 
   return NextResponse.json({ foto });
 }

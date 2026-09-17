@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { JWT_SECRET as SECRET } from "./lib/jwtSecret";
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
 const COOKIE_NAME = "admira_trace_session";
 
 const ROLE_PREFIX: Record<string, string> = {

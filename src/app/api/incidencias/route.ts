@@ -61,6 +61,12 @@ export async function GET(req: NextRequest) {
       viabilidadFotos: true,
     },
     orderBy: { fechaImportada: "desc" },
+    // Salvaguarda de rendimiento: el tablero no pagina todavía (agrupa por
+    // estado en el cliente), así que sin esto la consulta crecería sin
+    // límite con el histórico. 2.000 incidencias por proyecto es hoy muchas
+    // veces el volumen real; si algún día se alcanza, hará falta paginar de
+    // verdad en vez de solo subir este número.
+    take: 2000,
   });
 
   return NextResponse.json({ incidencias });
@@ -108,7 +114,9 @@ export async function POST(req: NextRequest) {
     include: { tecnico: true, estanco: true },
   });
 
-  await syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]);
+  syncToSheets(["incidencias", "tecnicos", "intervenciones", "censo"]).catch((err) =>
+    console.error("[incidencias] Error sincronizando Sheets:", err)
+  );
 
   await crearNotificacion({
     userId: tecnicoId,
