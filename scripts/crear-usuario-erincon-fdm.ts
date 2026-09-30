@@ -6,7 +6,8 @@ import { registrarCredencial } from "../src/lib/credencialesVault";
 /**
  * Alta de la cuenta FDM de Edison Rincón — ya tiene la de ADMIRA (usuario
  * "erincon"); la app solo admite un rol por cuenta, así que es una cuenta
- * independiente (ver [[alta-usuarios-staff]]).
+ * independiente (ver [[alta-usuarios-staff]]). Usuario "pruebafdm" a
+ * petición expresa (en vez del patrón habitual "erincon-fdm").
  *
  * Uso (mismo patrón que el resto de scripts one-off contra producción):
  *   docker build --target builder -t admira-builder-temp .
@@ -16,7 +17,7 @@ import { registrarCredencial } from "../src/lib/credencialesVault";
  *     admira-builder-temp npx tsx scripts/crear-usuario-erincon-fdm.ts
  *   docker rmi admira-builder-temp
  */
-const USERNAME = "erincon-fdm";
+const USERNAME = "pruebafdm";
 const NOMBRE = "Edison Rincón";
 const EMAIL = "erincon@admira.com";
 const ROL = "FDM";
